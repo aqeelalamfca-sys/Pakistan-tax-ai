@@ -1,22 +1,55 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 1.0.0
+  description: Tax Intelligence Engine API - Pakistan-focused AI Tax Software
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication and authorization
+  - name: firms
+    description: Firm management
+  - name: users
+    description: User management
+  - name: clients
+    description: Client onboarding and management
+  - name: engagements
+    description: Engagement workflow
+  - name: uploads
+    description: Document upload center
+  - name: validation
+    description: Validation engine
+  - name: mapping
+    description: Account mapping engine
+  - name: rules
+    description: Tax rule engine
+  - name: computation
+    description: Tax computation workspace
+  - name: withholding
+    description: Withholding tax review
+  - name: risks
+    description: Risk register
+  - name: reviews
+    description: Review notes and approval workflow
+  - name: ai
+    description: AI drafting assistant
+  - name: reports
+    description: Reporting and exports
+  - name: audit
+    description: Audit logs
+  - name: vault
+    description: Super Admin Knowledge Vault
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +57,2450 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /auth/mfa/setup:
+    post:
+      operationId: setupMfa
+      tags: [auth]
+      summary: Setup MFA for current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: MFA setup data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MfaSetupResponse"
+
+  /auth/mfa/verify:
+    post:
+      operationId: verifyMfa
+      tags: [auth]
+      summary: Verify MFA token
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaVerifyRequest"
+      responses:
+        "200":
+          description: MFA verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /clients:
+    get:
+      operationId: listClients
+      tags: [clients]
+      summary: List clients for current firm
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Clients list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientListResponse"
+    post:
+      operationId: createClient
+      tags: [clients]
+      summary: Create a new client
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClientRequest"
+      responses:
+        "201":
+          description: Client created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+
+  /clients/{id}:
+    get:
+      operationId: getClient
+      tags: [clients]
+      summary: Get client by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Client details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+    put:
+      operationId: updateClient
+      tags: [clients]
+      summary: Update client
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateClientRequest"
+      responses:
+        "200":
+          description: Client updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+    delete:
+      operationId: deleteClient
+      tags: [clients]
+      summary: Soft delete client
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Client deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /engagements:
+    get:
+      operationId: listEngagements
+      tags: [engagements]
+      summary: List engagements
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: clientId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Engagements list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EngagementListResponse"
+    post:
+      operationId: createEngagement
+      tags: [engagements]
+      summary: Create a new engagement
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEngagementRequest"
+      responses:
+        "201":
+          description: Engagement created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Engagement"
+
+  /engagements/{id}:
+    get:
+      operationId: getEngagement
+      tags: [engagements]
+      summary: Get engagement by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Engagement details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Engagement"
+    put:
+      operationId: updateEngagement
+      tags: [engagements]
+      summary: Update engagement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEngagementRequest"
+      responses:
+        "200":
+          description: Engagement updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Engagement"
+
+  /engagements/{id}/status:
+    patch:
+      operationId: updateEngagementStatus
+      tags: [engagements]
+      summary: Update engagement status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusUpdateRequest"
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Engagement"
+
+  /uploads:
+    get:
+      operationId: listUploads
+      tags: [uploads]
+      summary: List uploads for an engagement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Uploads list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadListResponse"
+    post:
+      operationId: createUpload
+      tags: [uploads]
+      summary: Upload a document
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UploadRequest"
+      responses:
+        "201":
+          description: Upload created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Upload"
+
+  /uploads/{id}:
+    get:
+      operationId: getUpload
+      tags: [uploads]
+      summary: Get upload status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Upload details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Upload"
+
+  /validation/{engagementId}:
+    get:
+      operationId: getValidationResults
+      tags: [validation]
+      summary: Get validation results for engagement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Validation results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationResultsResponse"
+    post:
+      operationId: runValidation
+      tags: [validation]
+      summary: Run validation for engagement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Validation triggered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /mapping/{engagementId}:
+    get:
+      operationId: getMappings
+      tags: [mapping]
+      summary: Get account mappings for engagement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Mappings list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MappingListResponse"
+    post:
+      operationId: saveMapping
+      tags: [mapping]
+      summary: Save or update account mapping
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveMappingRequest"
+      responses:
+        "200":
+          description: Mapping saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountMapping"
+
+  /rules:
+    get:
+      operationId: listRules
+      tags: [rules]
+      summary: List tax rules
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: taxType
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Rules list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleListResponse"
+    post:
+      operationId: createRule
+      tags: [rules]
+      summary: Create a new tax rule
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRuleRequest"
+      responses:
+        "201":
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxRule"
+
+  /rules/{engagementId}/run:
+    post:
+      operationId: runRules
+      tags: [rules]
+      summary: Run all rules for an engagement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Rules executed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleRunResponse"
+
+  /computation/{engagementId}:
+    get:
+      operationId: getComputation
+      tags: [computation]
+      summary: Get tax computation for engagement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Computation details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxComputation"
+    post:
+      operationId: saveComputation
+      tags: [computation]
+      summary: Save tax computation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveComputationRequest"
+      responses:
+        "200":
+          description: Computation saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxComputation"
+
+  /computation/{engagementId}/lock:
+    post:
+      operationId: lockComputation
+      tags: [computation]
+      summary: Lock computation (Partner only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Computation locked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /computation/{engagementId}/unlock:
+    post:
+      operationId: unlockComputation
+      tags: [computation]
+      summary: Unlock computation (Partner only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnlockRequest"
+      responses:
+        "200":
+          description: Computation unlocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /withholding/{engagementId}:
+    get:
+      operationId: getWithholdingEntries
+      tags: [withholding]
+      summary: Get withholding entries for engagement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Withholding entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WithholdingResponse"
+
+  /risks/{engagementId}:
+    get:
+      operationId: listRisks
+      tags: [risks]
+      summary: Get risk register for engagement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: severity
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Risk register
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskListResponse"
+
+  /risks/{id}/status:
+    patch:
+      operationId: updateRiskStatus
+      tags: [risks]
+      summary: Update risk status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RiskStatusUpdate"
+      responses:
+        "200":
+          description: Risk updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskFlag"
+
+  /reviews/{engagementId}/notes:
+    get:
+      operationId: listReviewNotes
+      tags: [reviews]
+      summary: Get review notes for engagement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Review notes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewNoteListResponse"
+    post:
+      operationId: createReviewNote
+      tags: [reviews]
+      summary: Create review note
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewNoteRequest"
+      responses:
+        "201":
+          description: Review note created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewNote"
+
+  /reviews/{engagementId}/approve:
+    post:
+      operationId: approveEngagement
+      tags: [reviews]
+      summary: Approve engagement (Partner only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApprovalRequest"
+      responses:
+        "200":
+          description: Engagement approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Approval"
+
+  /ai/generate:
+    post:
+      operationId: generateAiOutput
+      tags: [ai]
+      summary: Generate AI drafted output
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiGenerateRequest"
+      responses:
+        "200":
+          description: AI output generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiOutput"
+
+  /ai/outputs/{id}/promote:
+    post:
+      operationId: promoteAiOutput
+      tags: [ai]
+      summary: Promote AI output to review note (explicit human action required)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: AI output promoted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /reports/{engagementId}/export:
+    post:
+      operationId: exportReport
+      tags: [reports]
+      summary: Export report pack (locked snapshots only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: engagementId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportRequest"
+      responses:
+        "200":
+          description: Export triggered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportResponse"
+
+  /audit:
+    get:
+      operationId: listAuditLogs
+      tags: [audit]
+      summary: List audit logs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: firmId
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: module
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogListResponse"
+
+  /vault/documents:
+    get:
+      operationId: listVaultDocuments
+      tags: [vault]
+      summary: List knowledge vault documents (Super Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: taxType
+          in: query
+          schema:
+            type: string
+        - name: docType
+          in: query
+          schema:
+            type: string
+        - name: jurisdiction
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Vault documents list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaultDocumentListResponse"
+    post:
+      operationId: uploadVaultDocument
+      tags: [vault]
+      summary: Upload document to knowledge vault (Super Admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/VaultUploadRequest"
+      responses:
+        "201":
+          description: Document uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaultDocument"
+
+  /vault/documents/{id}:
+    get:
+      operationId: getVaultDocument
+      tags: [vault]
+      summary: Get vault document details
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Vault document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaultDocument"
+    put:
+      operationId: updateVaultDocument
+      tags: [vault]
+      summary: Update vault document metadata (Super Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVaultDocumentRequest"
+      responses:
+        "200":
+          description: Document updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaultDocument"
+    delete:
+      operationId: deleteVaultDocument
+      tags: [vault]
+      summary: Delete vault document (Super Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Document deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /vault/documents/{id}/activate:
+    patch:
+      operationId: activateVaultDocument
+      tags: [vault]
+      summary: Activate vault document (Super Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Document activated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaultDocument"
+
+  /vault/documents/{id}/deactivate:
+    patch:
+      operationId: deactivateVaultDocument
+      tags: [vault]
+      summary: Deactivate vault document (Super Admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Document deactivated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaultDocument"
+
+  /vault/documents/{id}/versions:
+    get:
+      operationId: getVaultDocumentVersions
+      tags: [vault]
+      summary: Get version history for a vault document
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaultVersionListResponse"
+
+  /vault/search:
+    post:
+      operationId: searchVault
+      tags: [vault]
+      summary: Search vault documents for AI retrieval
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VaultSearchRequest"
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaultSearchResponse"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List users for current firm
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Users list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a new user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     HealthStatus:
       type: object
       properties:
         status:
           type: string
+        timestamp:
+          type: string
+        services:
+          type: object
+          properties:
+            db:
+              type: string
+            redis:
+              type: string
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        mfaToken:
+          type: string
+      required:
+        - email
+        - password
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/UserProfile"
+        requiresMfa:
+          type: boolean
+      required:
+        - token
+        - user
+
+    MfaSetupResponse:
+      type: object
+      properties:
+        secret:
+          type: string
+        qrCodeUrl:
+          type: string
+        backupCodes:
+          type: array
+          items:
+            type: string
+      required:
+        - secret
+        - qrCodeUrl
+
+    MfaVerifyRequest:
+      type: object
+      properties:
+        token:
+          type: string
+      required:
+        - token
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          type: string
+        firmId:
+          type: string
+        firmName:
+          type: string
+        mfaEnabled:
+          type: boolean
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - email
+        - role
+
+    CreateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - firstName
+        - lastName
+        - role
+        - password
+
+    UserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserProfile"
+        total:
+          type: integer
+      required:
+        - users
+        - total
+
+    Client:
+      type: object
+      properties:
+        id:
+          type: string
+        firmId:
+          type: string
+        legalName:
+          type: string
+        ntn:
+          type: string
+        cnic:
+          type: string
+        registrationNo:
+          type: string
+        businessType:
+          type: string
+        industry:
+          type: string
+        taxTypes:
+          type: array
+          items:
+            type: string
+        address:
+          type: string
+        contactPersons:
+          type: array
+          items:
+            type: object
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - firmId
+        - legalName
+
+    CreateClientRequest:
+      type: object
+      properties:
+        legalName:
+          type: string
+        ntn:
+          type: string
+        cnic:
+          type: string
+        registrationNo:
+          type: string
+        businessType:
+          type: string
+        industry:
+          type: string
+        taxTypes:
+          type: array
+          items:
+            type: string
+        address:
+          type: string
+        contactPersons:
+          type: array
+          items:
+            type: object
+      required:
+        - legalName
+
+    UpdateClientRequest:
+      type: object
+      properties:
+        legalName:
+          type: string
+        ntn:
+          type: string
+        cnic:
+          type: string
+        registrationNo:
+          type: string
+        businessType:
+          type: string
+        industry:
+          type: string
+        taxTypes:
+          type: array
+          items:
+            type: string
+        address:
+          type: string
+        contactPersons:
+          type: array
+          items:
+            type: object
+        status:
+          type: string
+
+    ClientListResponse:
+      type: object
+      properties:
+        clients:
+          type: array
+          items:
+            $ref: "#/components/schemas/Client"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+        - clients
+        - total
+
+    Engagement:
+      type: object
+      properties:
+        id:
+          type: string
+        clientId:
+          type: string
+        clientName:
+          type: string
+        firmId:
+          type: string
+        title:
+          type: string
+        taxYear:
+          type: string
+        taxType:
+          type: string
+        status:
+          type: string
+        teamMembers:
+          type: array
+          items:
+            type: string
+        isLocked:
+          type: boolean
+        lockedAt:
+          type: string
+          format: date-time
+        lockedBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - clientId
+        - title
+        - taxYear
+        - status
+
+    CreateEngagementRequest:
+      type: object
+      properties:
+        clientId:
+          type: string
+        title:
+          type: string
+        taxYear:
+          type: string
+        taxType:
+          type: string
+        teamMembers:
+          type: array
+          items:
+            type: string
+      required:
+        - clientId
+        - title
+        - taxYear
+
+    UpdateEngagementRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        taxYear:
+          type: string
+        taxType:
+          type: string
+        teamMembers:
+          type: array
+          items:
+            type: string
+
+    StatusUpdateRequest:
+      type: object
+      properties:
+        status:
+          type: string
+        reason:
+          type: string
+      required:
+        - status
+
+    EngagementListResponse:
+      type: object
+      properties:
+        engagements:
+          type: array
+          items:
+            $ref: "#/components/schemas/Engagement"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+        - engagements
+        - total
+
+    Upload:
+      type: object
+      properties:
+        id:
+          type: string
+        engagementId:
+          type: string
+        fileName:
+          type: string
+        fileSize:
+          type: integer
+        mimeType:
+          type: string
+        category:
+          type: string
+        parsedStatus:
+          type: string
+        validationStatus:
+          type: string
+        sha256Hash:
+          type: string
+        uploadedBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - engagementId
+        - fileName
+        - category
+        - parsedStatus
+
+    UploadRequest:
+      type: object
+      properties:
+        engagementId:
+          type: string
+        category:
+          type: string
+        file:
+          type: string
+          format: binary
+      required:
+        - engagementId
+        - category
+        - file
+
+    UploadListResponse:
+      type: object
+      properties:
+        uploads:
+          type: array
+          items:
+            $ref: "#/components/schemas/Upload"
+        total:
+          type: integer
+      required:
+        - uploads
+        - total
+
+    ValidationResult:
+      type: object
+      properties:
+        id:
+          type: string
+        uploadId:
+          type: string
+        checkType:
+          type: string
+        status:
+          type: string
+        message:
+          type: string
+        affectedRows:
+          type: array
+          items:
+            type: integer
+        suggestedFix:
+          type: string
+      required:
+        - id
+        - checkType
+        - status
+
+    ValidationResultsResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationResult"
+        summary:
+          type: object
+          properties:
+            total:
+              type: integer
+            passed:
+              type: integer
+            warnings:
+              type: integer
+            failed:
+              type: integer
+      required:
+        - results
+
+    AccountMapping:
+      type: object
+      properties:
+        id:
+          type: string
+        engagementId:
+          type: string
+        sourceValue:
+          type: string
+        mappingType:
+          type: string
+        mappedTo:
+          type: string
+        confidence:
+          type: number
+        isManualOverride:
+          type: boolean
+        overrideReason:
+          type: string
+        isMapped:
+          type: boolean
+      required:
+        - id
+        - engagementId
+        - sourceValue
+        - mappingType
+
+    SaveMappingRequest:
+      type: object
+      properties:
+        sourceValue:
+          type: string
+        mappingType:
+          type: string
+        mappedTo:
+          type: string
+        overrideReason:
+          type: string
+      required:
+        - sourceValue
+        - mappingType
+        - mappedTo
+
+    MappingListResponse:
+      type: object
+      properties:
+        mappings:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountMapping"
+        completionPercent:
+          type: number
+        totalRequired:
+          type: integer
+        totalMapped:
+          type: integer
+      required:
+        - mappings
+        - completionPercent
+
+    TaxRule:
+      type: object
+      properties:
+        id:
+          type: string
+        ruleCode:
+          type: string
+        title:
+          type: string
+        taxType:
+          type: string
+        entityType:
+          type: string
+        conditionJson:
+          type: object
+        actionJson:
+          type: object
+        severity:
+          type: string
+        materialityThreshold:
+          type: number
+        evidenceRequired:
+          type: boolean
+        effectiveFrom:
+          type: string
+          format: date
+        effectiveTo:
+          type: string
+          format: date
+        ruleStatus:
+          type: string
+        versionNo:
+          type: integer
+      required:
+        - id
+        - ruleCode
+        - title
+        - taxType
+        - severity
+        - ruleStatus
+
+    CreateRuleRequest:
+      type: object
+      properties:
+        ruleCode:
+          type: string
+        title:
+          type: string
+        taxType:
+          type: string
+        entityType:
+          type: string
+        conditionJson:
+          type: object
+        actionJson:
+          type: object
+        severity:
+          type: string
+        materialityThreshold:
+          type: number
+        evidenceRequired:
+          type: boolean
+        effectiveFrom:
+          type: string
+          format: date
+        effectiveTo:
+          type: string
+          format: date
+      required:
+        - ruleCode
+        - title
+        - taxType
+        - severity
+
+    RuleListResponse:
+      type: object
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaxRule"
+        total:
+          type: integer
+      required:
+        - rules
+        - total
+
+    RuleRunResponse:
+      type: object
+      properties:
+        rulesEvaluated:
+          type: integer
+        riskFlagsCreated:
+          type: integer
+        adjustmentsCreated:
+          type: integer
+        summary:
+          type: string
+      required:
+        - rulesEvaluated
+
+    TaxComputation:
+      type: object
+      properties:
+        id:
+          type: string
+        engagementId:
+          type: string
+        accountingResult:
+          type: number
+        totalAdjustments:
+          type: number
+        taxableIncome:
+          type: number
+        grossTax:
+          type: number
+        minimumTaxAmount:
+          type: number
+        taxPayable:
+          type: number
+        lessWithholding:
+          type: number
+        lessAdvances:
+          type: number
+        netPayableOrRefundable:
+          type: number
+        isLocked:
+          type: boolean
+        adjustments:
+          type: array
+          items:
+            type: object
+        aiCommentary:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - engagementId
+
+    SaveComputationRequest:
+      type: object
+      properties:
+        accountingResult:
+          type: number
+        adjustments:
+          type: array
+          items:
+            type: object
+        withholdingCredits:
+          type: number
+        carryforwards:
+          type: number
+        taxRate:
+          type: number
+        minimumTax:
+          type: number
+      required:
+        - accountingResult
+
+    UnlockRequest:
+      type: object
+      properties:
+        reopenReason:
+          type: string
+      required:
+        - reopenReason
+
+    WithholdingEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        engagementId:
+          type: string
+        vendorName:
+          type: string
+        sectionCode:
+          type: string
+        grossAmount:
+          type: number
+        expectedRate:
+          type: number
+        actualRate:
+          type: number
+        whtDeducted:
+          type: number
+        shortDeduction:
+          type: number
+        overDeduction:
+          type: number
+        certificateStatus:
+          type: string
+        depositStatus:
+          type: string
+        isException:
+          type: boolean
+      required:
+        - id
+        - vendorName
+        - sectionCode
+
+    WithholdingResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/WithholdingEntry"
+        kpis:
+          type: object
+          properties:
+            totalPaymentsReviewed:
+              type: number
+            exceptionsCount:
+              type: integer
+            likelyShortDeductionExposure:
+              type: number
+            unresolvedHighRiskItems:
+              type: integer
+      required:
+        - entries
+
+    RiskFlag:
+      type: object
+      properties:
+        id:
+          type: string
+        engagementId:
+          type: string
+        riskCode:
+          type: string
+        severity:
+          type: string
+        confidence:
+          type: number
+        estimatedImpact:
+          type: number
+        title:
+          type: string
+        description:
+          type: string
+        recommendation:
+          type: string
+        status:
+          type: string
+        owner:
+          type: string
+        dueDate:
+          type: string
+          format: date
+        disposition:
+          type: string
+        sourceModule:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - engagementId
+        - severity
+        - status
+
+    RiskStatusUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+        disposition:
+          type: string
+        owner:
+          type: string
+        dueDate:
+          type: string
+          format: date
+      required:
+        - status
+
+    RiskListResponse:
+      type: object
+      properties:
+        risks:
+          type: array
+          items:
+            $ref: "#/components/schemas/RiskFlag"
+        total:
+          type: integer
+        highCount:
+          type: integer
+        mediumCount:
+          type: integer
+        lowCount:
+          type: integer
+      required:
+        - risks
+        - total
+
+    ReviewNote:
+      type: object
+      properties:
+        id:
+          type: string
+        engagementId:
+          type: string
+        content:
+          type: string
+        authorId:
+          type: string
+        authorName:
+          type: string
+        status:
+          type: string
+        parentId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - engagementId
+        - content
+
+    CreateReviewNoteRequest:
+      type: object
+      properties:
+        content:
+          type: string
+        parentId:
+          type: string
+      required:
+        - content
+
+    ReviewNoteListResponse:
+      type: object
+      properties:
+        notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewNote"
+        total:
+          type: integer
+        openCount:
+          type: integer
+      required:
+        - notes
+        - total
+
+    ApprovalRequest:
+      type: object
+      properties:
+        comments:
+          type: string
+      required: []
+
+    Approval:
+      type: object
+      properties:
+        id:
+          type: string
+        engagementId:
+          type: string
+        approvedBy:
+          type: string
+        approverName:
+          type: string
+        comments:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - engagementId
+        - approvedBy
+
+    AiGenerateRequest:
+      type: object
+      properties:
+        engagementId:
+          type: string
+        promptKey:
+          type: string
+        context:
+          type: object
+        useVault:
+          type: boolean
+          default: true
+      required:
+        - engagementId
+        - promptKey
+
+    AiOutput:
+      type: object
+      properties:
+        id:
+          type: string
+        engagementId:
+          type: string
+        promptKey:
+          type: string
+        content:
+          type: string
+        moderationFlags:
+          type: array
+          items:
+            type: string
+        references:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiReference"
+        isStaged:
+          type: boolean
+        isPromoted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - content
+        - isStaged
+
+    AiReference:
+      type: object
+      properties:
+        documentId:
+          type: string
+        documentTitle:
+          type: string
+        lawSection:
+          type: string
+        issueDate:
+          type: string
+        effectiveDate:
+          type: string
+        pageReference:
+          type: string
+        relevanceScore:
+          type: number
+      required:
+        - documentId
+        - documentTitle
+
+    ExportRequest:
+      type: object
+      properties:
+        exportType:
+          type: string
+          enum:
+            - computation_summary
+            - adjustment_schedule
+            - withholding_report
+            - risk_register
+            - advisory_memo
+            - partner_review_pack
+        format:
+          type: string
+          enum: [pdf, excel, docx, zip]
+      required:
+        - exportType
+        - format
+
+    ExportResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+        downloadUrl:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+        - jobId
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        userName:
+          type: string
+        firmId:
+          type: string
+        action:
+          type: string
+        module:
+          type: string
+        beforeState:
+          type: object
+        afterState:
+          type: object
+        ipAddress:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - action
+        - module
+
+    AuditLogListResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLog"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+        - logs
+        - total
+
+    VaultDocument:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        docType:
+          type: string
+        taxType:
+          type: string
+        jurisdiction:
+          type: string
+        lawSection:
+          type: string
+        issueDate:
+          type: string
+          format: date
+        effectiveDate:
+          type: string
+          format: date
+        expiryDate:
+          type: string
+          format: date
+        status:
+          type: string
+        priority:
+          type: integer
+        versionNo:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+        summary:
+          type: string
+        fileName:
+          type: string
+        fileSize:
+          type: integer
+        mimeType:
+          type: string
+        uploadedBy:
+          type: string
+        indexedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - docType
+        - status
+
+    VaultUploadRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        docType:
+          type: string
+        taxType:
+          type: string
+        jurisdiction:
+          type: string
+        lawSection:
+          type: string
+        issueDate:
+          type: string
+          format: date
+        effectiveDate:
+          type: string
+          format: date
+        expiryDate:
+          type: string
+          format: date
+        priority:
+          type: integer
+        tags:
+          type: string
+        file:
+          type: string
+          format: binary
+      required:
+        - title
+        - docType
+        - file
+
+    UpdateVaultDocumentRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        docType:
+          type: string
+        taxType:
+          type: string
+        jurisdiction:
+          type: string
+        lawSection:
+          type: string
+        issueDate:
+          type: string
+          format: date
+        effectiveDate:
+          type: string
+          format: date
+        expiryDate:
+          type: string
+          format: date
+        priority:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+        summary:
+          type: string
+
+    VaultDocumentListResponse:
+      type: object
+      properties:
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/VaultDocument"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+        - documents
+        - total
+
+    VaultVersion:
+      type: object
+      properties:
+        id:
+          type: string
+        documentId:
+          type: string
+        versionNo:
+          type: integer
+        fileName:
+          type: string
+        uploadedBy:
+          type: string
+        changeNote:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - versionNo
+
+    VaultVersionListResponse:
+      type: object
+      properties:
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/VaultVersion"
+        total:
+          type: integer
+      required:
+        - versions
+        - total
+
+    VaultSearchRequest:
+      type: object
+      properties:
+        query:
+          type: string
+        taxType:
+          type: string
+        docType:
+          type: string
+        jurisdiction:
+          type: string
+        limit:
+          type: integer
+          default: 5
+      required:
+        - query
+
+    VaultSearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              document:
+                $ref: "#/components/schemas/VaultDocument"
+              relevanceScore:
+                type: number
+              excerpt:
+                type: string
+              matchedSections:
+                type: array
+                items:
+                  type: string
+        totalFound:
+          type: integer
+      required:
+        - results
+        - totalFound

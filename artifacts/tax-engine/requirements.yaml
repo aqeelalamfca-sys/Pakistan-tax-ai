@@ -1,0 +1,20 @@
+packages:
+  "framer-motion": "For fluid page transitions and interactive micro-animations"
+  "recharts": "For rendering beautiful KPI trend charts on the dashboard"
+  "date-fns": "For formatting complex audit and engagement dates"
+  "react-hook-form": "For robust form state management and validation"
+  "@hookform/resolvers": "Zod integration for react-hook-form"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility to merge tailwind classes safely"
+
+images:
+  - path: "artifacts/tax-engine/public/images/logo.png"
+    description: "A minimal, modern geometric logo for a tax intelligence software. Professional, using dark Pakistan Green (#2D6A4F) and elegant gold accents. Transparent background."
+    aspect_ratio: "1:1"
+  - path: "artifacts/tax-engine/public/images/auth-bg.png"
+    description: "Abstract, elegant dark geometric background with soft glowing emerald green and deep teal gradients. Premium corporate aesthetic, soft lighting, 4k resolution."
+    aspect_ratio: "16:9"
+
+notes:
+  - "The App.tsx contains a global fetch interceptor to inject the JWT token from localStorage into all Orval-generated API calls."
+  - "Assumes standard shadcn/ui components are pre-generated in src/components/ui/."

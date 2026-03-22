@@ -1,0 +1,1178 @@
+You are a senior full-stack architect, tax-tech product engineer, DevOps engineer, database designer, QA lead, and security engineer. Build a production-grade AI-based Tax Software for Pakistan from scratch as a monorepo, fully ready for development in Replit, source control in GitHub, and deployment on a Hostinger VPS through Docker containers. Follow this instruction strictly. Do not skip modules. Do not leave placeholders unless they are clearly marked as environment variables. Do not change the required architecture. The system must be modular, secure, audit-trailed, AI-assisted, role-based, and production deployable.
+
+====================================================
+1) CORE OPERATING RULE
+====================================================
+Use this operating model only:
+Replit = development workspace
+GitHub = source of truth
+Hostinger VPS = production runtime
+Docker Compose = orchestration
+Nginx = reverse proxy + SSL
+PostgreSQL = relational database
+Redis + BullMQ = queues, caching, background jobs
+Never deploy directly from Replit to production.
+All production changes must flow:
+Replit → GitHub → GitHub Actions → Hostinger VPS
+
+====================================================
+2) PRODUCT NAME + PURPOSE
+====================================================
+App Name: Tax Intelligence Engine
+Purpose: AI-based tax practice and tax intelligence software for Pakistan-focused CA / tax / advisory firms.
+Target users:
+- Super Admin
+- Firm Admin
+- Partner
+- Tax Manager
+- Senior
+- Associate
+- Reviewer
+- Client User
+
+The software must support:
+- firm isolation / multi-tenant architecture
+- client onboarding
+- engagement creation
+- secure document upload center
+- parsing and validation of tax and accounting data
+- mapping / normalization layer
+- deterministic tax rule engine
+- tax computation workspace
+- withholding tax review
+- risk engine and risk register
+- review notes and approval workflow
+- AI drafting assistant
+- reporting and export packs
+- immutable audit logging
+- containerized deployment to Hostinger VPS
+- GitHub Actions CI/CD
+
+====================================================
+3) REQUIRED TECH STACK
+====================================================
+Frontend:
+- Next.js 14 App Router
+- React + TypeScript strict mode
+- Tailwind CSS
+- React Hook Form
+- Zod
+- TanStack Table
+
+Backend:
+- Next.js API routes
+- Prisma ORM
+- PostgreSQL
+- Redis
+- BullMQ
+- JWT auth
+- bcrypt
+- otplib for MFA
+- multer / form-data handling
+- xlsx / papaparse for exports/imports
+
+Parser Microservice:
+- Python 3.11+
+- FastAPI
+- pandas
+- openpyxl
+- python-multipart
+- pydantic
+- uvicorn
+
+AI Layer:
+- provider abstraction router
+- OpenAI support
+- Gemini support
+- prompt versioning
+- moderation / safeguard checks
+- output staging only, never direct final posting
+
+Infrastructure:
+- Docker
+- Docker Compose
+- Nginx
+- GitHub Actions
+- Certbot-ready SSL structure
+- backup and health-check scripts
+
+====================================================
+4) MONOREPO STRUCTURE TO CREATE
+====================================================
+Create the exact structure below:
+
+tax-intelligence/
+├── apps/
+│   ├── web/                      # Next.js frontend + API routes
+│   └── worker/                   # BullMQ worker
+├── packages/
+│   ├── db/                       # Prisma schema + db client
+│   ├── common/                   # shared enums/types/utils
+│   ├── rules/                    # deterministic tax rule engine
+│   ├── ai/                       # AI provider router + prompt library
+│   └── ui/                       # shared UI components
+├── services/
+│   └── parser-service/           # Python FastAPI parser
+├── infra/
+│   ├── docker/                   # Dockerfiles
+│   ├── nginx/                    # nginx.conf
+│   └── scripts/                  # backup, health, smoke, restore
+├── .github/
+│   └── workflows/                # ci.yml, deploy.yml
+├── docs/
+│   ├── product/
+│   ├── api/
+│   └── deployment/
+├── .env.example
+├── docker-compose.yml
+├── package.json
+├── tsconfig.json
+├── turbo.json or workspace config if required
+└── README.md
+
+====================================================
+5) INITIAL PROJECT SETUP
+====================================================
+Initialize as npm workspaces monorepo.
+Create root package.json with workspaces:
+- apps/*
+- packages/*
+- services/*
+
+Create strict root tsconfig with path aliases for packages.
+Create .gitignore with:
+- node_modules
+- .env
+- .env.local
+- .env.production
+- .env.*.local
+- .next
+- dist
+- coverage
+- uploads
+- __pycache__
+- *.pyc
+
+Create .env.example with all documented variables:
+APP_NAME
+APP_URL
+NODE_ENV
+DATABASE_URL
+REDIS_URL
+REDIS_PASSWORD
+DB_USER
+DB_PASSWORD
+JWT_SECRET
+SESSION_SECRET
+ENCRYPTION_KEY
+OPENAI_API_KEY
+GEMINI_API_KEY
+AI_PROVIDER
+S3_ENDPOINT
+S3_BUCKET
+S3_ACCESS_KEY
+S3_SECRET_KEY
+S3_REGION
+SMTP_HOST
+SMTP_PORT
+SMTP_USER
+SMTP_PASS
+NGINX_SERVER_NAME
+
+====================================================
+6) DATABASE + PRISMA SCHEMA
+====================================================
+Create packages/db/prisma/schema.prisma with complete production-ready models and relations. Use String @id @default(cuid()) for primary keys. Use Decimal for amounts. Use Json for flexible data. Include timestamps. Add proper indexes and unique constraints.
+
+Required models:
+- Firm
+- User
+- Role
+- UserFirmAccess
+- Client
+- ClientTaxProfile
+- Engagement
+- Upload
+- UploadValidationResult
+- Document
+- AccountMapping
+- LedgerEntry
+- Invoice
+- InvoiceLine
+- WithholdingEntry
+- BankTransaction
+- TaxRule
+- RuleVersion (if needed for version history)
+- TaxComputation
+- TaxAdjustment
+- RiskFlag
+- ReviewNote
+- Approval
+- AdvisoryRecommendation
+- Task
+- AuditLog
+- AIRun
+- AIOutput
+
+Relationship rules:
+- Every User can belong to one or more firms through UserFirmAccess
+- Every Client belongs to one firm
+- Every Engagement belongs to one client
+- Every Upload belongs to one engagement
+- Every computation belongs to one engagement
+- Every risk flag belongs to one engagement
+- Every review note belongs to one engagement
+- Every approval belongs to one engagement
+- Every audit log belongs to user and optionally firm
+- AI runs/outputs must relate to engagement and user
+
+Add status fields where needed:
+- engagementStatus
+- parsedStatus
+- validationStatus
+- approvalStatus
+- riskStatus
+- reviewStatus
+
+After schema creation:
+- run prisma generate
+- create initial migration
+- wire db client helper in packages/db
+
+====================================================
+7) AUTHENTICATION + MFA + RBAC
+====================================================
+Build complete authentication first before any business pages.
+
+Create:
+- packages/common/src/roles.ts
+- apps/web/lib/auth/jwt.ts
+- apps/web/lib/auth/session.ts
+- apps/web/lib/auth/middleware.ts
+- apps/web/app/api/auth/register/route.ts
+- apps/web/app/api/auth/login/route.ts
+- apps/web/app/api/auth/logout/route.ts
+- apps/web/app/api/auth/mfa/setup/route.ts
+- apps/web/app/api/auth/mfa/verify/route.ts
+- apps/web/components/auth/LoginForm.tsx
+
+Role enum values:
+- SUPER_ADMIN
+- FIRM_ADMIN
+- PARTNER
+- TAX_MANAGER
+- SENIOR
+- ASSOCIATE
+- REVIEWER
+- CLIENT_USER
+
+Permissions framework:
+ROLE_PERMISSIONS map with actions:
+- prepare
+- review
+- approve
+- upload
+- download
+- manage_users
+- manage_firm
+- view_all_engagements
+- override_computation
+- export
+- manage_rules
+
+Requirements:
+- JWT with 8h expiry
+- httpOnly cookie or Authorization header support
+- bcrypt with 12 rounds
+- MFA using TOTP
+- firm-level row isolation via middleware
+- 401 for unauthenticated
+- 403 for unauthorized
+- all login/logout actions logged to AuditLog
+- never return passwordHash
+- TypeScript strict mode throughout
+
+====================================================
+8) CLIENT ONBOARDING MODULE
+====================================================
+Create full client onboarding flow.
+
+Pages / APIs:
+- client list page with pagination, filters, search
+- create client form
+- edit client page
+- tax profile form
+- related party editor
+- prior document uploader
+- create engagement workflow
+
+Client fields:
+- legal name
+- NTN
+- CNIC
+- registration no
+- business type
+- industry
+- tax types applicable
+- address
+- contact persons
+- related parties
+- prior year carryforwards
+- prior tax docs
+
+All APIs must:
+- use withAuth middleware
+- apply firm-level filtering
+- enforce validation using Zod
+- use soft deletes if delete is enabled
+- log create/update/delete to AuditLog
+
+====================================================
+9) ENGAGEMENT CREATION WORKFLOW
+====================================================
+On creation of engagement, automatically initialize:
+- engagement shell
+- module checklist
+- upload slots
+- team assignments
+- workflow status
+- review structure
+- draft computation scaffold
+
+Required engagement statuses:
+- Draft
+- Waiting for Data
+- Data Uploaded
+- Validated
+- Mapped
+- Draft Computation
+- Under Review
+- Approved
+- Filed / Closed
+
+Requirements:
+- role-based status transition controls
+- all transitions logged to AuditLog
+- status update APIs protected at backend, not only UI
+
+====================================================
+10) DATA UPLOAD CENTER
+====================================================
+Build secure upload center for engagement document intake.
+
+Required upload categories:
+- trial balance
+- general ledger
+- invoice register
+- withholding schedule
+- bank statements
+- payroll summary
+- prior tax computation
+- prior tax returns
+- tax notices
+- supporting documents
+
+Build:
+- POST /api/uploads
+- GET upload status route
+- uploads page per engagement
+- drag-and-drop UI
+- status polling UI
+- download original file
+- re-upload failed files
+
+Validation:
+- allowed MIME types: xlsx, xls, csv, pdf
+- max size: 50MB
+- compute SHA-256 hash
+- store file to local persistent volume or S3-compatible storage
+- create Upload metadata record
+- enqueue BullMQ parse-upload job
+- create audit log entry
+
+====================================================
+11) PYTHON PARSER MICROSERVICE
+====================================================
+Create services/parser-service/main.py with FastAPI.
+
+Endpoints:
+- GET /health
+- POST /parse
+
+Parser must support:
+- Excel
+- CSV
+- category-based column detection
+- normalization of uploaded rows
+
+Category handling:
+A) general_ledger:
+   output fields: date, account_code, description, debit, credit
+B) invoice_register:
+   output fields: invoice_no, vendor, date, amount, tax_amount, section
+C) withholding_schedule:
+   output fields: vendor, payment_nature, gross_amount, rate, wht_deducted
+D) bank_statements:
+   output fields: date, description, debit, credit, balance
+
+Response JSON:
+- rows
+- parser_version
+- columns_detected
+- row_count
+- errors
+
+The parser must never apply tax logic. It only parses and normalizes.
+
+====================================================
+12) WORKER + QUEUES
+====================================================
+Create apps/worker to run BullMQ jobs.
+
+Required queues:
+- parse-upload
+- run-validation
+- mapping-refresh if needed
+- run-rules if needed
+- export-build if needed
+
+parse-upload worker flow:
+- mark Upload.parsedStatus = processing
+- send file to parser-service
+- receive normalized rows
+- store to correct normalized tables
+- preserve traceability fields:
+  - sourceFileId
+  - sourceRowNumber
+  - parserVersion
+  - mappingVersion (nullable initially)
+- mark Upload.parsedStatus complete or failed
+- enqueue validation
+
+====================================================
+13) VALIDATION ENGINE
+====================================================
+Build full validation engine.
+
+Create:
+- packages/rules/src/validation/validationRunner.ts
+- structuralChecks.ts
+- arithmeticChecks.ts
+- duplicateChecks.ts
+- businessRuleChecks.ts
+- validation API routes
+- validation page UI
+
+Checks required:
+1. structural checks
+   - required columns
+   - correct datatypes
+   - blank mandatory fields
+   - date format
+   - MIME/category consistency
+2. arithmetic checks
+   - debit vs credit
+   - invoice totals
+   - balances
+3. duplicate checks
+   - duplicate invoice numbers
+   - duplicate references
+   - duplicate certificates
+4. business rule checks
+   - invalid rate/section mismatch
+   - out-of-period transaction
+   - payroll vs ledger inconsistency
+
+Each result must be one of:
+- pass
+- warning
+- fail
+
+UI must show:
+- color coded results
+- expandable details
+- affected rows
+- suggested fixes
+- acknowledge warning
+- download error rows CSV
+- re-upload action
+
+====================================================
+14) MAPPING ENGINE + NORMALIZATION
+====================================================
+Build mapping layer after validation.
+
+Create:
+- AccountMapping schema additions
+- packages/rules/src/mapping/mappingEngine.ts
+- mapping UI page
+- mapping APIs
+- template save/load functionality
+
+Mapping dimensions:
+- account_code -> expense category
+- vendor -> WHT section
+- ledger description -> admissibility
+
+Features:
+- auto-suggest with confidence score using fuzzy matching
+- manual override with reason logging
+- save firm template
+- load firm template
+- apply to all similar items
+- completion meter
+- prevent progression until required items mapped
+
+Critical rule:
+Never run tax logic on raw upload rows.
+All downstream logic must use normalized + mapped data only.
+
+====================================================
+15) DETERMINISTIC TAX RULE ENGINE
+====================================================
+This is a core system. Tax logic must exist only inside packages/rules, never inside UI components or API literals.
+
+Create:
+- packages/rules/src/engine/ruleEvaluator.ts
+- packages/rules/src/engine/ruleConditionParser.ts
+- rules APIs
+- rules library page
+- seeded starter rules
+
+Rule structure fields:
+- ruleCode
+- title
+- taxType
+- entityType
+- industry
+- conditionJson
+- actionJson
+- severity
+- materialityThreshold
+- evidenceRequired
+- effectiveFrom
+- effectiveTo
+- ruleStatus
+- versionNo
+- approvedBy
+
+Supported operators:
+- eq
+- neq
+- gt
+- lt
+- gte
+- lte
+- contains
+- not_contains
+- is_null
+- is_not_null
+- in_list
+- trend_spike
+
+Required functions:
+- evaluateCondition
+- evaluateRule
+- runAllRules
+
+Outputs:
+- RiskFlag records
+- TaxAdjustment records
+- summary report
+
+Seed at least 10 Pakistan starter tax rules, such as:
+- inadmissible expense candidate
+- WHT rate mismatch
+- missing evidence for deduction
+- unusual related party movement
+- expense trend spike
+- period mismatch
+- missing invoice reference
+- payroll vs ledger inconsistency
+
+====================================================
+16) TAX COMPUTATION WORKSPACE
+====================================================
+Build full workspace.
+
+Sections:
+- Accounting Result
+- Tax Adjustments
+- Withholding Credits
+- Carryforwards
+- Final Position
+- Unresolved Issues
+- AI Commentary
+- Evidence Links
+
+Requirements:
+- drill-down to source entries
+- manual adjustments with mandatory reason
+- overridden lines visibly marked
+- lock / unlock workflow
+- blocked mutation if snapshot locked
+- only PARTNER can lock/unlock
+- lock blocked if open high-severity risks exist
+- unlock requires reopen_reason min 30 chars
+- all approvals logged
+
+Create:
+- computation page
+- section components
+- computations API
+- lock route
+- unlock route
+- pure function finalPosition.ts in rules package
+
+Final position input:
+- accountingResult
+- adjustments
+- withholdingCredits
+- carryforwards
+- taxRate
+- minimumTax
+
+Output:
+- taxableIncome
+- grossTax
+- minimumTaxAmount
+- taxPayable
+- lessWithholding
+- lessAdvances
+- netPayableOrRefundable
+
+====================================================
+17) WITHHOLDING TAX REVIEW MODULE
+====================================================
+Build WHT module for Pakistan risk review.
+
+Create withholding page with TanStack Table:
+Columns:
+- vendor name
+- section code
+- expected rate
+- actual rate
+- short deduction
+- over deduction
+- certificate status
+- deposit status
+
+Features:
+- group by vendor
+- auto-calculate exceptions
+- create high-severity RiskFlags
+- KPI cards:
+  - total payments reviewed
+  - exceptions count
+  - likely short deduction exposure
+  - unresolved high-risk items
+- export to Excel
+
+====================================================
+18) RISK ENGINE + RISK REGISTER
+====================================================
+Create risk register by aggregating:
+- validation failures/warnings
+- rule-generated flags
+- withholding exceptions
+- AI-suggested items if enabled
+
+Risk fields:
+- riskCode
+- severity
+- confidence
+- estimatedImpact
+- sourceRecords
+- recommendation
+- status
+- owner
+- dueDate
+- disposition
+
+Requirements:
+- high-severity open risks block partner approval
+- one-click drilldown to source rows
+- status workflow for risks
+- full audit trail
+- filter/search table
+
+====================================================
+19) REVIEW NOTES + APPROVAL WORKFLOW
+====================================================
+Build maker-checker flow.
+
+Actors:
+- Associate / Senior = prepare
+- Tax Manager = review
+- Partner = approve and lock
+
+Create:
+- ReviewNote model and APIs
+- Approval model and APIs
+- threaded review note UI
+- submit for review flow
+- return for rework flow
+- escalate to partner flow
+- approve and lock flow
+
+Approval preconditions:
+- no open high-severity risks
+- all review notes closed
+- unresolved issue count = zero
+- partner permission only
+
+====================================================
+20) AI DRAFTING ASSISTANT
+====================================================
+AI must be assistive only, never final-authority.
+
+Allowed AI tasks:
+- summarize uploaded documents
+- explain risks in plain language
+- draft advisory memo
+- draft client clarification request
+- draft management summary
+- draft tax notice reply
+- convert technical analysis into user-friendly wording
+- year-end planning notes
+
+AI must never:
+- silently change tax numbers
+- approve outputs
+- modify rule library directly
+- trigger filing
+- delete evidence
+- override locked snapshots
+- directly write to final computation without human action
+
+Create:
+- packages/ai/src/providerRouter.ts
+- packages/ai/src/promptLibrary.ts
+- packages/ai/src/outputModeration.ts
+- /api/ai/generate
+- /api/ai/outputs/[id]/promote
+- AIAssistantPanel.tsx
+
+Provider router:
+- support OpenAI
+- support Gemini
+- provider chosen from env AI_PROVIDER
+- normalize responses
+
+Prompt library keys:
+- TAX_MEMO_DRAFT
+- RISK_EXPLANATION
+- PARTNER_REVIEW_SUMMARY
+- CLIENT_CLARIFICATION_REQUEST
+- NOTICE_REPLY_DRAFT
+- YEAR_END_PLANNING_NOTE
+- WHT_DISCREPANCY_EXPLANATION
+
+Moderation checks:
+- fabricated tax numbers not in source
+- definitive legal conclusions
+- PII not present in source
+Flag for review but do not auto-promote.
+
+AI data model:
+- AIRun
+- AIOutput
+
+Critical rule:
+AI output must be saved to staging only.
+Promotion to review note or advisory memo must require explicit human action and user authentication.
+
+====================================================
+21) REPORTING + EXPORTS
+====================================================
+Build export packs only from locked approved snapshots.
+
+Export types:
+- Computation Summary PDF
+- Adjustment Schedule Excel
+- Withholding Report Excel/PDF
+- Risk Register PDF
+- Advisory Memo DOCX/PDF
+- Partner Review Pack ZIP
+
+Requirements:
+- embed approval reference
+- export timestamp
+- exporting user identity
+- snapshot reference
+- no export from unlocked or unapproved computations
+
+====================================================
+22) IMMUTABLE AUDIT LOGGING
+====================================================
+AuditLog table must be insert-only.
+Never allow update or delete of audit logs.
+Enforce in Prisma middleware / service layer.
+
+Always log:
+- login/logout
+- file upload
+- mapping changes
+- rule changes
+- computation override
+- approvals
+- unlock/reopen
+- exports
+- soft deletes
+- AI generation/promotions
+- admin actions
+- status transitions
+
+Fields:
+- userId
+- firmId
+- action
+- module
+- beforeState
+- afterState
+- ipAddress
+- deviceInfo
+- createdAt
+
+====================================================
+23) UI / UX REQUIREMENTS
+====================================================
+Use modern professional dashboard style suitable for CA/tax firms.
+Requirements:
+- responsive
+- firm-safe professional color palette
+- sidebar navigation
+- top header with firm / user context
+- clear status badges
+- tables with search/filter/export
+- form validation messages
+- audit-friendly drilldowns
+- clear role-based UI actions
+- no clutter
+- user-friendly pages for real firm operations
+
+====================================================
+24) HEALTH ENDPOINT
+====================================================
+Create /api/health endpoint.
+Must verify:
+- app running
+- DB connectivity
+- Redis connectivity
+Return JSON:
+{
+  "status": "ok",
+  "timestamp": "...",
+  "services": {
+    "db": "ok",
+    "redis": "ok"
+  }
+}
+
+====================================================
+25) TESTING SUITE
+====================================================
+Build complete tests.
+
+Node/TS:
+- Jest + ts-jest
+
+Python:
+- pytest
+
+Write tests for:
+A) auth
+- JWT sign/verify
+- unauthenticated block
+- role permission enforcement
+- firm isolation
+- passwordHash never returned
+
+B) validation
+- debit/credit mismatch
+- duplicate invoices
+- invalid WHT rate/section
+- all-pass scenario
+
+C) rule engine
+- each operator true/false
+- trend_spike behavior
+- seeded rule firing
+- RiskFlag / TaxAdjustment creation
+
+D) computation
+- 5 scenarios for finalPosition pure function
+- lock blocked on open high risks
+- unlock creates audit trail
+
+E) uploads / queues
+- oversized file rejection
+- SHA-256 hash generation
+- BullMQ enqueue after upload
+- parser-service category parsing tests
+- /health test
+
+F) API integration
+- clients CRUD with auth
+- engagement creation
+- validation results retrieval
+- AI generation creates AIRun + AIOutput
+- promote requires explicit action
+
+====================================================
+26) SEED DATA
+====================================================
+Create packages/db/prisma/seed.ts
+
+Seed:
+- default roles
+- two demo firms
+- multiple demo users
+- one demo partner with MFA enabled
+- five clients covering common Pakistan tax entity/business types
+- one engagement per client
+- starter tax rules PKR-INC-001 to PKR-INC-010
+- sample ledger entries
+- sample withholding entries
+- sample invoices
+- enough data to test full pipeline end-to-end
+
+Demo login examples:
+- partner@demo.test
+- manager@demo.test
+- senior@demo.test
+Use hashed password for all.
+
+====================================================
+27) DOCKERIZATION
+====================================================
+Create:
+- infra/docker/Dockerfile.web
+- infra/docker/Dockerfile.worker
+- services/parser-service/Dockerfile
+
+Use production-ready images.
+Use multi-stage build where appropriate.
+Do not bake secrets into images.
+Mount persistent uploads volume.
+
+====================================================
+28) DOCKER COMPOSE
+====================================================
+Create root docker-compose.yml with services:
+- web
+- worker
+- parser
+- db
+- redis
+- nginx
+
+Requirements:
+- health checks
+- internal network
+- persistent volumes
+- env_file .env.production
+- restart unless-stopped
+- db postgres:16-alpine
+- redis:7-alpine with password
+- nginx reverse proxy to web
+- uploads volume shared where required
+
+====================================================
+29) NGINX
+====================================================
+Create infra/nginx/nginx.conf
+
+Requirements:
+- redirect HTTP to HTTPS
+- SSL-ready structure
+- proxy to web:3000
+- WebSocket support
+- client_max_body_size 50M
+- security headers:
+  - X-Frame-Options
+  - X-Content-Type-Options
+  - X-XSS-Protection
+  - Referrer-Policy
+  - Strict-Transport-Security
+- timeouts suitable for file uploads
+
+====================================================
+30) HOSTINGER VPS DEPLOYMENT READINESS
+====================================================
+Assume target production is Hostinger VPS with Docker Compose.
+
+Prepare deployment to:
+- Ubuntu 24.04 Docker VPS
+- deploy user
+- /opt/tax-intelligence app path
+- domain pointed to VPS
+- Nginx and SSL handling through mounted certs
+- no DB/Redis public exposure
+
+====================================================
+31) GITHUB ACTIONS
+====================================================
+Create:
+- .github/workflows/ci.yml
+- .github/workflows/deploy.yml
+
+CI workflow must:
+- run on push and PR
+- install dependencies
+- type-check
+- lint
+- prisma generate
+- migrate test DB
+- run tests
+- run parser pytest
+
+Deploy workflow must:
+- trigger on push to main
+- SSH to Hostinger VPS using secrets
+- pull latest code
+- write .env.production from GitHub secrets
+- docker compose up -d --build --remove-orphans
+- run prisma migrate deploy
+- run health check
+- prune old images
+
+Required GitHub secrets:
+- VPS_HOST
+- VPS_SSH_KEY
+- DATABASE_URL
+- REDIS_URL
+- REDIS_PASSWORD
+- DB_USER
+- DB_PASSWORD
+- JWT_SECRET
+- SESSION_SECRET
+- ENCRYPTION_KEY
+- OPENAI_API_KEY
+- GEMINI_API_KEY
+- AI_PROVIDER
+- S3_ENDPOINT
+- S3_BUCKET
+- S3_ACCESS_KEY
+- S3_SECRET_KEY
+- NGINX_SERVER_NAME
+
+====================================================
+32) INFRA SCRIPTS
+====================================================
+Create executable scripts under infra/scripts:
+- backup-db.sh
+- restore-test.sh
+- health-check.sh
+- smoke-test.sh
+
+backup-db.sh:
+- pg_dump compressed backup
+- timestamp file
+- retention cleanup
+- optional S3 copy
+- checksum log
+
+restore-test.sh:
+- restore latest backup to temp postgres container
+- verify record counts
+
+health-check.sh:
+- check container health
+- optional webhook alert
+
+smoke-test.sh:
+- hit /api/health
+- verify login endpoint reachable
+- verify DB migration status
+- verify nginx routing
+- verify worker and parser health
+
+====================================================
+33) SECURITY + HARDENING
+====================================================
+Implement:
+- HTTPS-only assumptions
+- MFA for admin/partner
+- secrets only in env or GitHub Secrets
+- no secrets in repo
+- insert-only audit logs
+- soft delete for business records if delete exists
+- db/redis internal only
+- runtime secret injection only
+- branch protection assumptions documented in README
+- security headers documented
+- role checks enforced server-side
+
+====================================================
+34) README + DOCS
+====================================================
+Generate README.md with:
+- project overview
+- architecture diagram in markdown text
+- local development steps
+- env variables
+- Replit workflow
+- GitHub workflow
+- Hostinger VPS deployment steps
+- Docker usage
+- backup/restore
+- health checks
+- rollback notes
+- security practices
+- common issues and fixes
+
+Also create docs for:
+- product modules
+- API overview
+- deployment guide
+
+====================================================
+35) EXECUTION ORDER
+====================================================
+Build modules in this exact order:
+1. monorepo scaffold
+2. env + workspace config
+3. prisma schema + db client
+4. auth + MFA + RBAC
+5. client onboarding
+6. engagement creation
+7. upload center
+8. parser service
+9. worker queues
+10. validation engine
+11. mapping engine
+12. deterministic rule engine
+13. computation workspace
+14. withholding module
+15. risk engine
+16. review notes + approvals
+17. AI assistant
+18. reporting + exports
+19. audit logging refinement
+20. tests
+21. dockerization
+22. nginx
+23. github actions
+24. infra scripts
+25. README/docs
+
+====================================================
+36) DELIVERY INSTRUCTION
+====================================================
+At the end, do all of the following:
+- create all files and folders
+- implement the code, not just pseudo-code
+- ensure builds are runnable
+- ensure tests are present
+- ensure Docker files are production-ready
+- ensure GitHub Actions files are ready
+- ensure Hostinger VPS deployment is ready
+- provide a final summary of what was created
+- provide exact commands to run locally in Replit
+- provide exact commands to push to GitHub
+- provide exact first-time VPS bootstrap commands
+- provide exact Docker Compose run commands
+- provide any remaining environment variables still needed from user side only
+
+Do not simplify. Do not omit. Build the full application structure and implementation as a production-ready foundation.

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Tax Intelligence Engine"
+version = "1.0.0"
+id = "artifacts/tax-engine"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22369
+
+[services.development]
+run = "pnpm --filter @workspace/tax-engine run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/tax-engine", "run", "build" ]
+publicDir = "artifacts/tax-engine/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22369"
+BASE_PATH = "/"

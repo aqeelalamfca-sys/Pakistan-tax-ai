@@ -1,96 +1,192 @@
-# Workspace
+# Tax Intelligence Engine — Pakistan AI Tax Software
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+A production-grade, Pakistan-focused AI tax computation platform built as a pnpm monorepo. The system covers the complete tax engagement lifecycle from client onboarding through partner approval with an integrated AI drafting assistant grounded in a Super Admin Knowledge Vault.
 
-## Stack
+**Brand Color:** Pakistan Green `#2D6A4F`
+**Deployment Target:** Hostinger VPS via Docker/Nginx (GitHub is source of truth — never deploy directly from Replit)
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+---
 
-## Structure
+## Architecture
 
-```text
-artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
-├── lib/                    # Shared libraries
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
+```
+pnpm-workspace/
+├── artifacts/
+│   ├── api-server/       Express 5 backend (port 8080)
+│   └── tax-engine/       React + Vite frontend (port from $PORT)
+├── lib/
+│   ├── api-client-react/ Orval-generated React Query hooks + Zod schemas
+│   ├── api-spec/         OpenAPI 3.0 specification (19+ modules)
+│   └── db/               Drizzle ORM + PostgreSQL (15 schema files)
+├── scripts/              Seed + utility scripts
+├── infra/                Docker, docker-compose, Nginx
+└── .github/workflows/    CI/CD (GitHub Actions)
 ```
 
-## TypeScript & Composite Projects
+---
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references. This means:
+## Running Services
 
-- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`). This builds the full dependency graph so that cross-package imports resolve correctly. Running `tsc` inside a single package will fail if its dependencies haven't been built yet.
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
-- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
+| Service      | Port  | Purpose                              |
+|-------------|-------|--------------------------------------|
+| API Server  | 8080  | Express 5, all REST endpoints        |
+| Tax Engine  | $PORT | React + Vite frontend                |
 
-## Root Scripts
+The Vite dev server proxies `/api/*` → `localhost:8080` for seamless development.
 
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
-- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
+---
 
-## Packages
+## Modules Implemented
 
-### `artifacts/api-server` (`@workspace/api-server`)
+### Backend API Routes (`artifacts/api-server/src/routes/`)
+| File             | Module                              |
+|-----------------|-------------------------------------|
+| `auth.ts`        | JWT login, logout, /me, MFA setup  |
+| `clients.ts`     | Client onboarding (CRUD + soft delete) |
+| `engagements.ts` | Engagement workflow + status changes |
+| `uploads.ts`     | File uploads (multer, SHA256 hash)  |
+| `validation.ts`  | Structural + arithmetic + duplicate checks |
+| `mapping.ts`     | Account code / ledger mapping       |
+| `rules.ts`       | Tax rule engine + risk flag generation |
+| `computation.ts` | Tax computation workspace (lock/unlock) |
+| `withholding.ts` | WHT review with exception detection |
+| `risks.ts`       | Risk register (HIGH/MEDIUM/LOW)     |
+| `reviews.ts`     | Review notes + partner approval locking |
+| `ai.ts`          | AI drafting assistant (vault-grounded, staged) |
+| `vault.ts`       | Super Admin Knowledge Vault         |
+| `audit.ts`       | Immutable audit log viewer          |
+| `users.ts`       | User management (RBAC-protected)    |
 
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
+### Frontend Pages (`artifacts/tax-engine/src/pages/`)
+- `login.tsx` — JWT login with MFA support
+- `dashboard.tsx` — KPI overview with charts
+- `clients.tsx` — Client list with search
+- `client-detail.tsx` — Client profile + engagement history
+- `engagements.tsx` — Engagement list with status filters
+- `engagement-workspace.tsx` — Full workspace (upload, validate, compute)
+- `vault.tsx` — Knowledge Vault (SUPER_ADMIN only)
 
-- Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
-- Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
+---
 
-### `lib/db` (`@workspace/db`)
+## Authentication & RBAC
 
-Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
+**Roles (8 levels):**
+```
+SUPER_ADMIN > FIRM_ADMIN > PARTNER > TAX_MANAGER > SENIOR > ASSOCIATE > REVIEWER > CLIENT_USER
+```
 
-- `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
+**JWT:** 8-hour expiry, stored in `localStorage` as `tax_engine_token`
+**MFA:** TOTP via speakeasy (optional per user, stored as base32 secret)
 
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
+---
 
-### `lib/api-spec` (`@workspace/api-spec`)
+## Database Schema (PostgreSQL via Drizzle ORM)
 
-Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.ts`). Running codegen produces output into two sibling packages:
+15 tables in `lib/db/src/schema/`:
+- `firms`, `users` — Multi-tenant firm and user management
+- `clients` — Client onboarding with soft delete
+- `engagements` — Engagement lifecycle with checklist
+- `uploads` — File upload tracking with SHA256
+- `validation_results` — Check results per upload
+- `account_mappings` — Ledger/account code mapping
+- `tax_rules` — PKR-INC-001 to PKR-INC-010 (10 seeded)
+- `tax_computations` — Tax computation with lock mechanism
+- `withholding_entries` — WHT register with exception flags
+- `risk_flags` — Risk register with severity
+- `review_notes`, `approvals` — Review workflow
+- `ai_runs`, `ai_outputs` — AI generation with staging
+- `vault_documents`, `vault_versions` — Knowledge Vault with versioning
+- `audit_logs` — Insert-only immutable audit trail
 
-1. `lib/api-client-react/src/generated/` — React Query hooks + fetch client
-2. `lib/api-zod/src/generated/` — Zod schemas
+---
 
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
+## Seed Data
 
-### `lib/api-zod` (`@workspace/api-zod`)
+Run: `pnpm --filter @workspace/scripts run seed`
 
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
+Demo credentials:
+```
+superadmin@demo.test / Admin@1234  (SUPER_ADMIN)
+partner@demo.test    / Partner@1234 (PARTNER)
+manager@demo.test    / Manager@1234 (TAX_MANAGER)
+senior@demo.test     / Senior@1234  (SENIOR)
+```
 
-### `lib/api-client-react` (`@workspace/api-client-react`)
+Seeded with:
+- 2 demo firms
+- 5 clients (Textile, Tech, Manufacturing, Trading, Individual)
+- 5 engagements with various statuses
+- 10 Pakistan income tax rules (PKR-INC-001 to PKR-INC-010)
+- 4 WHT entries with exceptions
+- 5 Knowledge Vault documents
 
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
+---
 
-### `scripts` (`@workspace/scripts`)
+## Key Business Rules
 
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+- **Computation Lock:** Blocked if any open HIGH severity risks exist
+- **Computation Unlock:** Requires reason ≥ 30 characters, logged to audit
+- **Partner Approval:** Blocked if open HIGH risks OR open review notes exist
+- **AI Outputs:** Always staged (`isPromoted: false`); explicit human promote action required
+- **AI References:** Vault documents auto-appended as References section
+- **Knowledge Vault:** SUPER_ADMIN only; all actions audited
+- **Audit Logs:** Insert-only at service layer (no update/delete routes)
+- **WHT Exception:** Flagged when short/over-deduction > PKR 1,000
+
+---
+
+## Infrastructure
+
+- `infra/Dockerfile.api` — Production Docker image for API
+- `infra/Dockerfile.frontend` — Nginx-served frontend Docker image
+- `infra/docker-compose.yml` — Full stack compose (postgres, api, frontend)
+- `infra/nginx.conf` — Nginx with `/api/` proxy upstream + SPA fallback
+- `.github/workflows/ci.yml` — Typecheck + build + Docker CI
+
+---
+
+## Development Commands
+
+```bash
+# Start all services
+pnpm --filter @workspace/api-server run dev
+pnpm --filter @workspace/tax-engine run dev
+
+# Database
+pnpm --filter @workspace/db run push    # Push schema
+pnpm --filter @workspace/scripts run seed  # Seed data
+
+# Build
+pnpm --filter @workspace/api-server run build
+pnpm --filter @workspace/tax-engine run build
+
+# Type check
+pnpm run typecheck
+```
+
+---
+
+## Environment Variables
+
+| Variable         | Required | Description                        |
+|-----------------|----------|------------------------------------|
+| `DATABASE_URL`  | Yes      | PostgreSQL connection string        |
+| `JWT_SECRET`    | Yes      | Secret for JWT signing (change in prod!) |
+| `PORT`          | Yes      | Port for each service ($PORT per artifact) |
+| `AI_PROVIDER`   | No       | `openai` (default) or `gemini`     |
+| `OPENAI_API_KEY`| No       | OpenAI key for AI generation       |
+| `UPLOAD_DIR`    | No       | File upload directory (default /tmp/uploads) |
+| `VAULT_DIR`     | No       | Vault storage directory (default /tmp/vault) |
+
+---
+
+## Deployment (Hostinger VPS)
+
+**IMPORTANT:** GitHub is the source of truth. Never deploy directly from Replit.
+
+1. Push to `main` branch → GitHub Actions CI runs
+2. SSH to VPS: `git pull && docker compose -f infra/docker-compose.yml up -d --build`
+3. Set production env vars in `.env` file on VPS (never commit)
+4. Run migrations: `docker exec api node -e "require('./dist/migrate.mjs')"`

@@ -32,8 +32,6 @@ services:
       context: ..
       dockerfile: infra/Dockerfile.api
     container_name: pakistan-tax-ai-app
-    ports:
-      - "${APP_PORT:-4080}:8080"
     environment:
       NODE_ENV: production
       PORT: 8080
@@ -50,7 +48,6 @@ services:
       - pakistan_tax_ai_vault:/app/vault
     networks:
       - pakistan_tax_ai_network
-      - auditwise_default
     depends_on:
       pakistan-tax-ai-db:
         condition: service_healthy
@@ -60,6 +57,26 @@ services:
       timeout: 10s
       retries: 5
       start_period: 90s
+
+  pakistan-tax-ai-nginx:
+    <<: *common
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.frontend.prod
+    container_name: pakistan-tax-ai-nginx
+    ports:
+      - "4080:80"
+    networks:
+      - pakistan_tax_ai_network
+      - auditwise_default
+    depends_on:
+      pakistan-tax-ai-app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/api/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   pakistan_tax_ai_postgres_data:
@@ -75,4 +92,3 @@ networks:
     driver: bridge
   auditwise_default:
     external: true
-    name: auditwise_default

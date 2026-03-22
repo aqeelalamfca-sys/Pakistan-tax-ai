@@ -60,13 +60,30 @@ The Vite dev server proxies `/api/*` → `localhost:8080` for seamless developme
 | `users.ts`       | User management (RBAC-protected)    |
 
 ### Frontend Pages (`artifacts/tax-engine/src/pages/`)
-- `login.tsx` — JWT login with MFA support
-- `dashboard.tsx` — KPI overview with charts
-- `clients.tsx` — Client list with search
-- `client-detail.tsx` — Client profile + engagement history
-- `engagements.tsx` — Engagement list with status filters
-- `engagement-workspace.tsx` — Full workspace (upload, validate, compute)
-- `vault.tsx` — Knowledge Vault (SUPER_ADMIN only)
+| Page | Route | Description |
+|------|-------|-------------|
+| `login.tsx` | `/login` | JWT login with MFA support |
+| `dashboard.tsx` | `/` | KPI overview with charts |
+| `clients.tsx` | `/clients` | Client list with search |
+| `client-detail.tsx` | `/clients/:id` | Client profile + engagement history |
+| `engagements.tsx` | `/engagements` | Engagement list with status filters |
+| `engagement-workspace.tsx` | `/engagements/:id` | Full 9-tab workspace (see below) |
+| `tax-rules.tsx` | `/rules` | Tax rules library with create/filter |
+| `audit-logs.tsx` | `/audit` | Immutable audit trail with filters + CSV export |
+| `users.tsx` | `/users` | Team member management with invite |
+| `vault.tsx` | `/vault` | Knowledge Vault (SUPER_ADMIN only) |
+| `profile.tsx` | `/profile` | User profile, change password, MFA status |
+
+### Engagement Workspace Tabs (9 tabs)
+1. **Overview** — Stats cards, workflow progress stepper, engagement details, financial summary
+2. **Upload Center** — Upload trial balances, ledgers, schedules (multer, SHA256)
+3. **Validation** — Run structural/arithmetic/duplicate checks
+4. **Mapping** — Map chart-of-accounts to Pakistan tax return line items
+5. **Computation** — Tax computation workspace with lock/unlock
+6. **WHT Review** — Withholding tax register with exception detection
+7. **Risk Register** — Risk items with severity, mitigate/accept/reopen actions
+8. **Review Notes** — Review notes + partner approval workflow
+9. **AI Assistant** — Vault-grounded drafting with staging area
 
 ---
 

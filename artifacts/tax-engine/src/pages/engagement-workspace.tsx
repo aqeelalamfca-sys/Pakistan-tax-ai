@@ -10,12 +10,14 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { 
-  UploadCloud, FileCheck, Map, Calculator, Shield, Database, FolderKanban,
-  AlertTriangle, MessageSquare, Sparkles, CheckCircle2, XCircle, FileType, CheckCircle, Lock, Unlock, Play
+  UploadCloud, FileCheck, Map, Calculator, Shield, Database, FolderKanban, ArrowRightLeft,
+  AlertTriangle, MessageSquare, Sparkles, CheckCircle2, XCircle, FileType, CheckCircle, Lock, Unlock, Play,
+  ClipboardCheck, Send, Eye, Calendar, User, BarChart3, TrendingUp
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -304,6 +306,443 @@ const ComputationTab = ({ engagementId, isPartner }: { engagementId: string, isP
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+const OverviewTab = ({ engagement }: { engagement: any }) => {
+  const { data: uploads } = useListUploads({ engagementId: engagement.id });
+  const { data: risks } = useListRisks(engagement.id);
+  const { data: notes } = useListReviewNotes(engagement.id);
+  const { data: computation } = useGetComputation(engagement.id);
+
+  const uploadCount = uploads?.uploads?.length ?? 0;
+  const riskCount = risks?.risks?.length ?? 0;
+  const openHighRisks = (risks?.risks ?? []).filter((r: any) => r.severity === "HIGH" && r.status === "open").length;
+  const noteCount = notes?.notes?.length ?? 0;
+
+  const STATUS_STEPS = [
+    { key: "DATA_COLLECTION", label: "Data Collection" },
+    { key: "VALIDATION", label: "Validation" },
+    { key: "MAPPING", label: "Mapping" },
+    { key: "COMPUTATION", label: "Computation" },
+    { key: "REVIEW", label: "Review" },
+    { key: "PARTNER_APPROVAL", label: "Partner Approval" },
+    { key: "FILED", label: "Filed" },
+  ];
+
+  const currentStepIdx = STATUS_STEPS.findIndex(s => s.key === engagement.status);
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "Files Uploaded", value: uploadCount, icon: UploadCloud, color: "text-blue-600" },
+          { label: "Open Risks", value: riskCount, icon: Shield, color: riskCount > 0 ? "text-amber-600" : "text-green-600" },
+          { label: "Review Notes", value: noteCount, icon: MessageSquare, color: "text-indigo-600" },
+          { label: "Computation", value: computation?.isLocked ? "Locked" : "Draft", icon: Calculator, color: computation?.isLocked ? "text-green-600" : "text-amber-600" },
+        ].map(s => (
+          <Card key={s.label}>
+            <CardContent className="pt-5 pb-4 flex items-center gap-4">
+              <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center bg-muted", s.color)}>
+                <s.icon className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
+                <p className={cn("text-2xl font-bold mt-0.5", s.color)}>{s.value}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {openHighRisks > 0 && (
+        <div className="flex items-center gap-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl p-4">
+          <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+          <p className="text-sm text-red-800 dark:text-red-400"><strong>{openHighRisks} HIGH severity risk{openHighRisks > 1 ? "s" : ""}</strong> must be resolved before computation can be locked.</p>
+        </div>
+      )}
+
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary" /> Workflow Progress</CardTitle></CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-1">
+            {STATUS_STEPS.map((step, idx) => {
+              const done = idx < currentStepIdx;
+              const active = idx === currentStepIdx;
+              return (
+                <div key={step.key} className="flex-1 flex flex-col items-center">
+                  <div className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all",
+                    done ? "bg-primary border-primary text-primary-foreground" :
+                    active ? "bg-primary/10 border-primary text-primary" :
+                    "bg-muted border-border text-muted-foreground"
+                  )}>
+                    {done ? <CheckCircle className="w-4 h-4" /> : idx + 1}
+                  </div>
+                  <p className={cn("text-[10px] mt-1.5 text-center font-medium leading-tight", active ? "text-primary" : "text-muted-foreground")}>
+                    {step.label}
+                  </p>
+                  {idx < STATUS_STEPS.length - 1 && (
+                    <div className={cn("h-0.5 w-full mt-[-22px] mb-6", done ? "bg-primary" : "bg-border")} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Engagement Details</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {[
+              { label: "Client", value: engagement.clientName },
+              { label: "Tax Year", value: engagement.taxYear },
+              { label: "Return Type", value: engagement.returnType?.replace(/_/g, " ") },
+              { label: "Status", value: engagement.status?.replace(/_/g, " ") },
+              { label: "Assigned To", value: engagement.assignedUserName || "Unassigned" },
+              { label: "Deadline", value: engagement.deadline ? formatDate(engagement.deadline) : "Not set" },
+              { label: "Created", value: formatDate(engagement.createdAt) },
+            ].map(item => (
+              <div key={item.label} className="flex justify-between py-1.5 border-b border-border/30 last:border-0">
+                <span className="text-sm text-muted-foreground">{item.label}</span>
+                <span className="text-sm font-medium">{item.value}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Financial Summary</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {[
+              { label: "Accounting Profit", value: formatCurrency(computation?.accountingResult ?? 0) },
+              { label: "Total Adjustments", value: formatCurrency(computation?.totalAdjustments ?? 0) },
+              { label: "Taxable Income", value: formatCurrency(computation?.taxableIncome ?? 0) },
+              { label: "Gross Tax", value: formatCurrency(computation?.grossTax ?? 0) },
+              { label: "Less: WHT Credits", value: `(${formatCurrency(computation?.lessWithholding ?? 0)})` },
+              { label: "Net Payable / Refundable", value: formatCurrency(computation?.netPayableOrRefundable ?? 0), bold: true },
+            ].map(item => (
+              <div key={item.label} className={cn("flex justify-between py-1.5 border-b border-border/30 last:border-0", item.bold && "pt-3 mt-1 border-t-2 border-primary/20")}>
+                <span className={cn("text-sm", item.bold ? "font-semibold text-foreground" : "text-muted-foreground")}>{item.label}</span>
+                <span className={cn("text-sm font-mono", item.bold ? "font-bold text-primary text-lg" : "font-medium")}>{item.value}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+const MappingTab = ({ engagementId }: { engagementId: string }) => {
+  const { data, isLoading } = useGetMappings(engagementId);
+  const saveMutation = useSaveMapping();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [taxCode, setTaxCode] = useState("");
+
+  const mappings = (data?.mappings ?? []) as any[];
+
+  const handleSave = (sourceAccount: string) => {
+    saveMutation.mutate(
+      { engagementId, data: { sourceAccount, taxCode } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: [`/api/mapping/${engagementId}`] });
+          toast({ title: "Mapping saved" });
+          setEditingId(null);
+          setTaxCode("");
+        },
+        onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
+      }
+    );
+  };
+
+  const mapped = mappings.filter(m => m.taxCode || m.taxAccountCode);
+  const unmapped = mappings.filter(m => !m.taxCode && !m.taxAccountCode);
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="flex justify-between items-center bg-card p-4 rounded-xl border shadow-sm">
+        <div>
+          <h3 className="text-lg font-semibold">Account Mapping</h3>
+          <p className="text-sm text-muted-foreground">Map chart-of-accounts entries to Pakistan tax return line items</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-green-600">{mapped.length}</p>
+            <p className="text-xs text-muted-foreground">Mapped</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold text-amber-600">{unmapped.length}</p>
+            <p className="text-xs text-muted-foreground">Unmapped</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold text-foreground">{mappings.length}</p>
+            <p className="text-xs text-muted-foreground">Total</p>
+          </div>
+        </div>
+      </div>
+
+      {mappings.length > 0 && (
+        <div className="w-full bg-muted/50 rounded-full h-2.5">
+          <div
+            className="bg-primary h-2.5 rounded-full transition-all"
+            style={{ width: `${mappings.length > 0 ? (mapped.length / mappings.length) * 100 : 0}%` }}
+          />
+        </div>
+      )}
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <ArrowRightLeft className="w-5 h-5 text-primary" />
+            Account Mappings
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-8 text-center animate-pulse text-muted-foreground">Loading mappings...</div>
+          ) : mappings.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">No account data available. Upload a trial balance or general ledger first.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Source Account</TableHead>
+                  <TableHead>Account Name</TableHead>
+                  <TableHead className="text-right">Balance (PKR)</TableHead>
+                  <TableHead>Tax Return Code</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-32">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {mappings.map(m => {
+                  const code = m.sourceAccount ?? m.accountCode ?? m.id;
+                  const name = m.accountName ?? m.sourceAccountName ?? "—";
+                  const balance = Number(m.balance ?? m.amount ?? 0);
+                  const mapped = m.taxCode ?? m.taxAccountCode;
+                  const isEditing = editingId === code;
+                  return (
+                    <TableRow key={m.id ?? code} className="hover:bg-muted/40">
+                      <TableCell className="font-mono text-sm font-semibold">{code}</TableCell>
+                      <TableCell className="text-sm">{name}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{formatCurrency(balance)}</TableCell>
+                      <TableCell>
+                        {isEditing ? (
+                          <Input
+                            className="h-8 w-40 text-sm"
+                            placeholder="e.g. IT-101"
+                            value={taxCode}
+                            onChange={e => setTaxCode(e.target.value)}
+                            autoFocus
+                          />
+                        ) : (
+                          <span className={cn("text-sm", mapped ? "font-mono font-medium text-primary" : "text-muted-foreground italic")}>
+                            {mapped || "Not mapped"}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {mapped ? (
+                          <span className="text-xs text-green-700 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> Mapped</span>
+                        ) : (
+                          <span className="text-xs text-amber-600 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Pending</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isEditing ? (
+                          <div className="flex gap-1">
+                            <Button size="sm" className="h-7 text-xs bg-primary" onClick={() => handleSave(code)} disabled={saveMutation.isPending}>
+                              Save
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingId(null)}>
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setEditingId(code); setTaxCode(mapped ?? ""); }}>
+                            {mapped ? "Edit" : "Map"}
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+const ReviewNotesTab = ({ engagementId, isPartner }: { engagementId: string; isPartner: boolean }) => {
+  const { data, isLoading } = useListReviewNotes(engagementId);
+  const createMutation = useCreateReviewNote();
+  const approveMutation = useApproveEngagement();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const [noteContent, setNoteContent] = useState("");
+  const [noteType, setNoteType] = useState("comment");
+
+  const notes = (data?.notes ?? []) as any[];
+  const openNotes = notes.filter(n => n.status === "open" || !n.resolvedAt);
+
+  const handleCreateNote = () => {
+    if (!noteContent.trim()) return toast({ variant: "destructive", title: "Note content is required" });
+    createMutation.mutate(
+      { engagementId, data: { content: noteContent, noteType, section: "general" } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: [`/api/reviews/${engagementId}/notes`] });
+          toast({ title: "Review note added" });
+          setNoteContent("");
+        },
+        onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
+      }
+    );
+  };
+
+  const handleApprove = () => {
+    approveMutation.mutate(
+      { engagementId, data: { decision: "APPROVED", comments: "Approved by Partner" } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: [`/api/engagements/${engagementId}`] });
+          toast({ title: "Engagement approved by Partner" });
+        },
+        onError: (err: any) => toast({ variant: "destructive", title: "Cannot approve", description: err.message }),
+      }
+    );
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {isPartner && (
+        <div className="flex justify-between items-center bg-card p-4 rounded-xl border shadow-sm">
+          <div>
+            <h3 className="text-lg font-semibold">Partner Approval</h3>
+            <p className="text-sm text-muted-foreground">
+              {openNotes.length > 0
+                ? `${openNotes.length} open review note${openNotes.length > 1 ? "s" : ""} must be resolved before approval.`
+                : "All review notes are resolved. Ready for partner approval."}
+            </p>
+          </div>
+          <Button
+            onClick={handleApprove}
+            disabled={approveMutation.isPending || openNotes.length > 0}
+            className={cn("bg-primary", openNotes.length > 0 && "opacity-50")}
+          >
+            <ClipboardCheck className="w-4 h-4 mr-2" /> Approve Engagement
+          </Button>
+        </div>
+      )}
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle>Add Review Note</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-3 items-end">
+            <div className="flex-1 space-y-2">
+              <Textarea
+                placeholder="Enter review note, question, or observation..."
+                value={noteContent}
+                onChange={e => setNoteContent(e.target.value)}
+                rows={2}
+                className="resize-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <Select value={noteType} onValueChange={setNoteType}>
+                <SelectTrigger className="w-36 h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="comment">Comment</SelectItem>
+                  <SelectItem value="query">Query</SelectItem>
+                  <SelectItem value="issue">Issue</SelectItem>
+                  <SelectItem value="action_item">Action Item</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={handleCreateNote} disabled={createMutation.isPending} className="w-full bg-primary">
+                <Send className="w-4 h-4 mr-2" /> Post Note
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-primary" />
+            Review Notes ({notes.length})
+            {openNotes.length > 0 && (
+              <Badge variant="secondary" className="ml-2 bg-amber-100 text-amber-800">{openNotes.length} open</Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-8 text-center animate-pulse text-muted-foreground">Loading notes...</div>
+          ) : notes.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">No review notes yet. Add the first note above.</div>
+          ) : (
+            <div className="divide-y divide-border/50">
+              {notes.map((note: any) => {
+                const isOpen = note.status === "open" || !note.resolvedAt;
+                const typeColors: Record<string, string> = {
+                  comment: "bg-blue-100 text-blue-800",
+                  query: "bg-purple-100 text-purple-800",
+                  issue: "bg-red-100 text-red-800",
+                  action_item: "bg-amber-100 text-amber-800",
+                };
+                return (
+                  <div key={note.id} className={cn("p-4 hover:bg-muted/20 transition-colors", !isOpen && "opacity-60")}>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded uppercase", typeColors[note.noteType ?? "comment"] ?? "bg-muted text-muted-foreground")}>
+                            {(note.noteType ?? "comment").replace(/_/g, " ")}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            by {note.authorName ?? note.createdByName ?? "Unknown"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {note.createdAt ? formatDate(note.createdAt) : ""}
+                          </span>
+                        </div>
+                        <p className="text-sm text-foreground leading-relaxed">{note.content}</p>
+                        {note.section && note.section !== "general" && (
+                          <p className="text-xs text-muted-foreground mt-1">Section: {note.section}</p>
+                        )}
+                      </div>
+                      <div>
+                        {isOpen ? (
+                          <span className="text-xs text-amber-600 font-semibold flex items-center gap-1">
+                            <Eye className="w-3.5 h-3.5" /> Open
+                          </span>
+                        ) : (
+                          <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
+                            <CheckCircle className="w-3.5 h-3.5" /> Resolved
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
@@ -720,12 +1159,14 @@ export default function EngagementWorkspace() {
           <div className="border-b border-border/50 overflow-x-auto shrink-0 scrollbar-hide px-2">
             <TabsList className="bg-transparent justify-start w-full h-14 p-0">
               {[
-                { id: "overview", label: "Overview", icon: Map },
+                { id: "overview", label: "Overview", icon: BarChart3 },
                 { id: "uploads", label: "Upload Center", icon: UploadCloud },
                 { id: "validation", label: "Validation", icon: FileCheck },
+                { id: "mapping", label: "Mapping", icon: ArrowRightLeft },
                 { id: "computation", label: "Computation", icon: Calculator },
-                { id: "withholding", label: "Withholding (WHT)", icon: FileType },
+                { id: "withholding", label: "WHT Review", icon: FileType },
                 { id: "risks", label: "Risk Register", icon: Shield },
+                { id: "reviews", label: "Review Notes", icon: ClipboardCheck },
                 { id: "ai", label: "AI Assistant", icon: Sparkles },
               ].map(tab => (
                 <TabsTrigger 
@@ -740,12 +1181,14 @@ export default function EngagementWorkspace() {
           </div>
           
           <div className="flex-1 overflow-auto p-6 bg-muted/10">
-            <TabsContent value="overview" className="m-0 h-full"><p className="text-muted-foreground">Workspace Overview for {eng.title}. Use the tabs above to navigate the workflow.</p></TabsContent>
+            <TabsContent value="overview" className="m-0 h-full"><OverviewTab engagement={eng} /></TabsContent>
             <TabsContent value="uploads" className="m-0 h-full"><UploadCenter engagementId={eng.id} /></TabsContent>
             <TabsContent value="validation" className="m-0 h-full"><ValidationTab engagementId={eng.id} /></TabsContent>
+            <TabsContent value="mapping" className="m-0 h-full"><MappingTab engagementId={eng.id} /></TabsContent>
             <TabsContent value="computation" className="m-0 h-full"><ComputationTab engagementId={eng.id} isPartner={isPartner} /></TabsContent>
             <TabsContent value="withholding" className="m-0 h-full"><WithholdingTab engagementId={eng.id} /></TabsContent>
             <TabsContent value="risks" className="m-0 h-full"><RiskRegisterTab engagementId={eng.id} /></TabsContent>
+            <TabsContent value="reviews" className="m-0 h-full"><ReviewNotesTab engagementId={eng.id} isPartner={isPartner} /></TabsContent>
             <TabsContent value="ai" className="m-0 h-full"><AiAssistantTab engagementId={eng.id} /></TabsContent>
           </div>
         </Tabs>

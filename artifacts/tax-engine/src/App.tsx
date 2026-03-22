@@ -19,6 +19,7 @@ import KnowledgeVault from "./pages/vault";
 import TaxRules from "./pages/tax-rules";
 import AuditLogs from "./pages/audit-logs";
 import UsersPage from "./pages/users";
+import ProfilePage from "./pages/profile";
 
 // Configure API client: use relative /api (proxied by Vite to API server)
 setBaseUrl("");
@@ -55,6 +56,7 @@ function Router() {
       <Route path="/rules" component={() => <ProtectedRoute component={TaxRules} />} />
       <Route path="/audit" component={() => <ProtectedRoute component={AuditLogs} />} />
       <Route path="/users" component={() => <ProtectedRoute component={UsersPage} />} />
+      <Route path="/profile" component={() => <ProtectedRoute component={ProfilePage} />} />
       <Route path="/vault" component={() => <ProtectedRoute component={KnowledgeVault} />} />
       
       {/* Missing implementation placeholders falling back to not found nicely */}

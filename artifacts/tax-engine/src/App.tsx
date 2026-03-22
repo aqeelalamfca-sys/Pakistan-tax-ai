@@ -16,6 +16,7 @@ import ClientDetail from "./pages/client-detail";
 import Engagements from "./pages/engagements";
 import EngagementWorkspace from "./pages/engagement-workspace";
 import KnowledgeVault from "./pages/vault";
+import AiSettings from "./pages/ai-settings";
 import TaxRules from "./pages/tax-rules";
 import AuditLogs from "./pages/audit-logs";
 import UsersPage from "./pages/users";
@@ -58,6 +59,7 @@ function Router() {
       <Route path="/users" component={() => <ProtectedRoute component={UsersPage} />} />
       <Route path="/profile" component={() => <ProtectedRoute component={ProfilePage} />} />
       <Route path="/vault" component={() => <ProtectedRoute component={KnowledgeVault} />} />
+      <Route path="/ai-settings" component={() => <ProtectedRoute component={AiSettings} />} />
       
       {/* Missing implementation placeholders falling back to not found nicely */}
       <Route component={NotFound} />

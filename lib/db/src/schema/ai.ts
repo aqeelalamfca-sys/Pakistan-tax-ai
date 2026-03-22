@@ -43,6 +43,15 @@ export const insertAiRunSchema = createInsertSchema(aiRunsTable).omit({ id: true
 export type InsertAiRun = z.infer<typeof insertAiRunSchema>;
 export type AiRun = typeof aiRunsTable.$inferSelect;
 
+export const aiConfigTable = pgTable("ai_config", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  configKey: text("config_key").notNull().unique(),
+  configValue: text("config_value").notNull(),
+  isSecret: boolean("is_secret").notNull().default(false),
+  updatedBy: text("updated_by").references(() => usersTable.id),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const insertAiOutputSchema = createInsertSchema(aiOutputsTable).omit({ id: true, createdAt: true });
 export type InsertAiOutput = z.infer<typeof insertAiOutputSchema>;
 export type AiOutput = typeof aiOutputsTable.$inferSelect;

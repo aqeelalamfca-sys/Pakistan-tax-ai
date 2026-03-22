@@ -1,8 +1,8 @@
 import { Router, IRouter } from "express";
 import { db } from "@workspace/db";
-import { aiRunsTable, aiOutputsTable, vaultDocumentsTable } from "@workspace/db/schema";
+import { aiRunsTable, aiOutputsTable, aiConfigTable, vaultDocumentsTable } from "@workspace/db/schema";
 import { eq, and, like, sql } from "drizzle-orm";
-import { withAuth, AuthenticatedRequest } from "../lib/auth";
+import { withAuth, AuthenticatedRequest, requireRole } from "../lib/auth";
 import { logAudit, getClientIp } from "../lib/audit";
 import { z } from "zod";
 
@@ -28,6 +28,30 @@ const PROMPT_TEMPLATES: Record<string, string> = {
   WHT_DISCREPANCY_EXPLANATION: "Explain the withholding tax discrepancies found in the following engagement: {context}",
 };
 
+async function getAiConfig(key: string): Promise<string | null> {
+  try {
+    const [row] = await db.select().from(aiConfigTable).where(eq(aiConfigTable.configKey, key)).limit(1);
+    return row?.configValue || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getActiveProvider(): Promise<{ provider: string; model: string; apiKey: string | null }> {
+  const dbProvider = await getAiConfig("ai_provider");
+  const dbModel = await getAiConfig("ai_model");
+  const dbOpenAiKey = await getAiConfig("openai_api_key");
+  const dbGeminiKey = await getAiConfig("gemini_api_key");
+
+  const provider = dbProvider || process.env.AI_PROVIDER || "openai";
+  const model = dbModel || (provider === "gemini" ? "gemini-1.5-flash" : "gpt-4o-mini");
+  const apiKey = provider === "gemini"
+    ? (dbGeminiKey || process.env.GEMINI_API_KEY || null)
+    : (dbOpenAiKey || process.env.OPENAI_API_KEY || null);
+
+  return { provider, model, apiKey };
+}
+
 async function searchVaultDocuments(query: string, taxType?: string, limit = 5) {
   const conditions = [eq(vaultDocumentsTable.status, "active"), eq(vaultDocumentsTable.isDeleted, false)];
   if (taxType) conditions.push(eq(vaultDocumentsTable.taxType, taxType));
@@ -38,33 +62,65 @@ async function searchVaultDocuments(query: string, taxType?: string, limit = 5) 
   return docs;
 }
 
-async function callAI(prompt: string, provider: string): Promise<string> {
-  const openAiKey = process.env.OPENAI_API_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
-  const chosenProvider = provider || process.env.AI_PROVIDER || "openai";
+async function callAI(prompt: string, provider: string, model: string, apiKey: string | null): Promise<{ content: string; tokensUsed?: number; durationMs: number }> {
+  const start = Date.now();
 
-  if (chosenProvider === "openai" && openAiKey) {
+  if (provider === "openai" && apiKey) {
     try {
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${openAiKey}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: 2000,
+          model: model || "gpt-4o-mini",
+          messages: [
+            { role: "system", content: "You are a senior Pakistan tax advisor with deep expertise in Income Tax Ordinance 2001, Sales Tax Act 1990, Federal Excise Act, and all FBR circulars and SROs. Always cite specific law sections. Be precise and professional." },
+            { role: "user", content: prompt }
+          ],
+          max_tokens: 3000,
+          temperature: 0.3,
         }),
       });
-      const data = await response.json() as { choices: Array<{ message: { content: string } }> };
-      return data.choices?.[0]?.message?.content || "Unable to generate AI response.";
-    } catch {
-      return generateFallbackResponse(prompt);
+      const data = await response.json() as any;
+      if (data.error) {
+        return { content: generateFallbackResponse(prompt, `API Error: ${data.error.message}`), durationMs: Date.now() - start };
+      }
+      return {
+        content: data.choices?.[0]?.message?.content || "Unable to generate AI response.",
+        tokensUsed: data.usage?.total_tokens,
+        durationMs: Date.now() - start,
+      };
+    } catch (err: any) {
+      return { content: generateFallbackResponse(prompt, err.message), durationMs: Date.now() - start };
     }
   }
-  return generateFallbackResponse(prompt);
+
+  if (provider === "gemini" && apiKey) {
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model || "gemini-1.5-flash"}:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `You are a senior Pakistan tax advisor. ${prompt}` }] }],
+          generationConfig: { maxOutputTokens: 3000, temperature: 0.3 },
+        }),
+      });
+      const data = await response.json() as any;
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!content) {
+        return { content: generateFallbackResponse(prompt, "Empty Gemini response"), durationMs: Date.now() - start };
+      }
+      return { content, tokensUsed: data.usageMetadata?.totalTokenCount, durationMs: Date.now() - start };
+    } catch (err: any) {
+      return { content: generateFallbackResponse(prompt, err.message), durationMs: Date.now() - start };
+    }
+  }
+
+  return { content: generateFallbackResponse(prompt), durationMs: Date.now() - start };
 }
 
-function generateFallbackResponse(prompt: string): string {
-  return `[AI Draft - Requires Review]
+function generateFallbackResponse(prompt: string, error?: string): string {
+  const errorNote = error ? `\n\n⚠️ AI Provider Error: ${error}\nUsing built-in template response instead.\n` : "";
+  return `[AI Draft - Requires Review]${errorNote}
 
 Based on the provided context and applicable Pakistan tax laws, here is a preliminary analysis:
 
@@ -105,7 +161,7 @@ router.post("/generate", withAuth, async (req: AuthenticatedRequest, res) => {
       return;
     }
     const { engagementId, promptKey, context, useVault } = parsed.data;
-    const provider = process.env.AI_PROVIDER || "openai";
+    const { provider, model, apiKey } = await getActiveProvider();
 
     let vaultDocs: typeof vaultDocumentsTable.$inferSelect[] = [];
     let vaultContext = "";
@@ -126,12 +182,13 @@ router.post("/generate", withAuth, async (req: AuthenticatedRequest, res) => {
       userId: req.user!.userId,
       promptKey,
       provider,
+      model,
       vaultDocumentsUsed: vaultDocs.map(d => d.id),
       status: "running",
     }).returning();
 
-    const aiContent = await callAI(fullPrompt, provider);
-    const moderationFlags = moderateOutput(aiContent);
+    const result = await callAI(fullPrompt, provider, model, apiKey);
+    const moderationFlags = moderateOutput(result.content);
 
     const references = vaultDocs.map(d => ({
       documentId: d.id,
@@ -142,7 +199,7 @@ router.post("/generate", withAuth, async (req: AuthenticatedRequest, res) => {
       relevanceScore: 0.8,
     }));
 
-    let contentWithRefs = aiContent;
+    let contentWithRefs = result.content;
     if (references.length > 0) {
       contentWithRefs += "\n\n---\n## References\n" +
         references.map((r, i) =>
@@ -162,7 +219,11 @@ router.post("/generate", withAuth, async (req: AuthenticatedRequest, res) => {
       isPromoted: false,
     }).returning();
 
-    await db.update(aiRunsTable).set({ status: "completed" }).where(eq(aiRunsTable.id, aiRun.id));
+    await db.update(aiRunsTable).set({
+      status: "completed",
+      tokenCount: result.tokensUsed?.toString(),
+      durationMs: result.durationMs.toString(),
+    }).where(eq(aiRunsTable.id, aiRun.id));
 
     await logAudit({
       userId: req.user!.userId,
@@ -172,7 +233,7 @@ router.post("/generate", withAuth, async (req: AuthenticatedRequest, res) => {
       module: "ai",
       resourceId: output.id,
       resourceType: "AIOutput",
-      afterState: { promptKey, vaultDocsUsed: vaultDocs.length, moderationFlags } as Record<string, unknown>,
+      afterState: { promptKey, provider, model, vaultDocsUsed: vaultDocs.length, moderationFlags, durationMs: result.durationMs } as Record<string, unknown>,
       ipAddress: getClientIp(req),
     });
 
@@ -216,5 +277,123 @@ router.post("/outputs/:id/promote", withAuth, async (req: AuthenticatedRequest, 
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+const superAdminOnly = requireRole("SUPER_ADMIN");
+
+router.get("/settings", withAuth, superAdminOnly, async (req: AuthenticatedRequest, res) => {
+  try {
+    const rows = await db.select().from(aiConfigTable);
+    const settings: Record<string, string> = {};
+    for (const row of rows) {
+      settings[row.configKey] = row.isSecret ? maskSecret(row.configValue) : row.configValue;
+    }
+    const defaults: Record<string, string> = {
+      ai_provider: settings.ai_provider || process.env.AI_PROVIDER || "openai",
+      ai_model: settings.ai_model || "gpt-4o-mini",
+      openai_api_key: settings.openai_api_key || (process.env.OPENAI_API_KEY ? maskSecret(process.env.OPENAI_API_KEY) : ""),
+      gemini_api_key: settings.gemini_api_key || (process.env.GEMINI_API_KEY ? maskSecret(process.env.GEMINI_API_KEY) : ""),
+      ai_temperature: settings.ai_temperature || "0.3",
+      ai_max_tokens: settings.ai_max_tokens || "3000",
+      ai_system_prompt: settings.ai_system_prompt || "You are a senior Pakistan tax advisor with deep expertise in Income Tax Ordinance 2001, Sales Tax Act 1990, Federal Excise Act, and all FBR circulars and SROs.",
+      vault_search_limit: settings.vault_search_limit || "5",
+      moderation_enabled: settings.moderation_enabled || "true",
+    };
+    res.json({ settings: defaults, isConfigured: !!(settings.openai_api_key || process.env.OPENAI_API_KEY || settings.gemini_api_key || process.env.GEMINI_API_KEY) });
+  } catch (err) {
+    req.log.error({ err }, "Get AI settings error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.put("/settings", withAuth, superAdminOnly, async (req: AuthenticatedRequest, res) => {
+  try {
+    const updates = req.body as Record<string, string>;
+    const allowedKeys = [
+      "ai_provider", "ai_model", "openai_api_key", "gemini_api_key",
+      "ai_temperature", "ai_max_tokens", "ai_system_prompt",
+      "vault_search_limit", "moderation_enabled",
+    ];
+    const secretKeys = ["openai_api_key", "gemini_api_key"];
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (!allowedKeys.includes(key)) continue;
+      if (secretKeys.includes(key) && value && value.includes("••••")) continue;
+
+      const existing = await db.select().from(aiConfigTable).where(eq(aiConfigTable.configKey, key)).limit(1);
+      if (existing.length > 0) {
+        await db.update(aiConfigTable).set({
+          configValue: value,
+          isSecret: secretKeys.includes(key),
+          updatedBy: req.user!.userId,
+          updatedAt: new Date(),
+        }).where(eq(aiConfigTable.configKey, key));
+      } else {
+        await db.insert(aiConfigTable).values({
+          configKey: key,
+          configValue: value,
+          isSecret: secretKeys.includes(key),
+          updatedBy: req.user!.userId,
+        });
+      }
+    }
+
+    await logAudit({
+      userId: req.user!.userId,
+      userName: req.user!.email,
+      firmId: req.user!.firmId ?? undefined,
+      action: "AI_SETTINGS_UPDATE",
+      module: "ai",
+      resourceType: "AIConfig",
+      afterState: { updatedKeys: Object.keys(updates).filter(k => allowedKeys.includes(k)) } as Record<string, unknown>,
+      ipAddress: getClientIp(req),
+    });
+
+    res.json({ success: true, message: "AI settings updated" });
+  } catch (err) {
+    req.log.error({ err }, "Update AI settings error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/test-connection", withAuth, superAdminOnly, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { provider, apiKey, model } = req.body;
+    const testPrompt = "Respond with exactly: 'Connection successful. Pakistan Tax AI Engine is operational.'";
+    const result = await callAI(testPrompt, provider || "openai", model || "gpt-4o-mini", apiKey || null);
+    const isSuccess = !result.content.includes("AI Provider Error") && !result.content.includes("[AI Draft");
+    res.json({
+      success: isSuccess,
+      message: isSuccess ? "AI connection successful" : "Connection failed - using fallback",
+      response: result.content.substring(0, 200),
+      durationMs: result.durationMs,
+    });
+  } catch (err) {
+    req.log.error({ err }, "AI test connection error");
+    res.status(500).json({ error: "Test failed", message: (err as Error).message });
+  }
+});
+
+router.get("/stats", withAuth, superAdminOnly, async (req: AuthenticatedRequest, res) => {
+  try {
+    const [totalRuns] = await db.select({ count: sql<number>`count(*)` }).from(aiRunsTable);
+    const [totalOutputs] = await db.select({ count: sql<number>`count(*)` }).from(aiOutputsTable);
+    const [promotedOutputs] = await db.select({ count: sql<number>`count(*)` }).from(aiOutputsTable).where(eq(aiOutputsTable.isPromoted, true));
+    const recentRuns = await db.select().from(aiRunsTable).orderBy(sql`created_at DESC`).limit(10);
+    res.json({
+      totalRuns: Number(totalRuns.count),
+      totalOutputs: Number(totalOutputs.count),
+      promotedOutputs: Number(promotedOutputs.count),
+      recentRuns,
+    });
+  } catch (err) {
+    req.log.error({ err }, "AI stats error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+function maskSecret(value: string): string {
+  if (!value || value.length < 8) return "••••••••";
+  return value.substring(0, 4) + "••••••••" + value.substring(value.length - 4);
+}
 
 export default router;

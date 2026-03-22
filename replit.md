@@ -154,20 +154,132 @@ Seeded with:
 
 ---
 
-## Infrastructure
+## Infrastructure & DevOps
 
-- `infra/Dockerfile.api` — Production Docker image for API
-- `infra/Dockerfile.frontend` — Nginx-served frontend Docker image
-- `infra/docker-compose.yml` — Full stack compose (postgres, api, frontend)
-- `infra/nginx.conf` — Nginx with `/api/` proxy upstream + SPA fallback
-- `.github/workflows/ci.yml` — Typecheck + build + Docker CI
+### Project Identity
+| Key | Value |
+|-----|-------|
+| Project Name | Pakistan Tax AI |
+| Live Domain | https://tax.auditwise.tech |
+| GitHub Owner | aqeelalamfca-sys |
+| GitHub Repo | Pakistan-tax-ai |
+| VPS Path | /opt/pakistan-tax-ai |
+| Source of Truth | GitHub ONLY |
+
+### File Layout
+```
+infra/
+├── Dockerfile.api                  Multi-stage API image (Node 24)
+├── Dockerfile.frontend             Multi-stage frontend image (Nginx Alpine)
+├── docker-compose.yml              Dev compose (original, for local use)
+├── docker-compose.prod.yml         PRODUCTION compose (isolated names/networks)
+├── nginx.conf                      Internal Nginx (container-level SPA + API proxy)
+└── nginx.tax.auditwise.tech.conf   VPS host-level Nginx (SSL, domain routing)
+
+devops/
+├── _config.sh         Shared config loader
+├── control.sh         Master control script (all commands)
+├── push.sh            Push to GitHub
+├── deploy.sh          Full deploy (build + restart)
+├── deploy-quick.sh    Quick deploy (pull + recreate)
+├── health.sh          Health check
+├── backup.sh          Database backup
+├── rollback.sh        Rollback to previous commit
+├── logs.sh            View container logs
+├── restart.sh         Restart services
+└── setup-ssh.sh       SSH key generation
+
+.github/workflows/
+├── ci.yml             CI: typecheck + build + Docker build test
+└── deploy.yml         CD: auto-deploy to VPS on push to main
+```
+
+### Production Isolation (from existing auditwise.tech)
+| Resource | Pakistan Tax AI | Existing AuditWise |
+|----------|----------------|--------------------|
+| VPS Path | /opt/pakistan-tax-ai | /opt/auditwise |
+| DB Container | pakistan-tax-ai-db | (separate) |
+| App Container | pakistan-tax-ai-app | (separate) |
+| Nginx Container | pakistan-tax-ai-nginx | (separate) |
+| Docker Network | pakistan_tax_ai_network | (separate) |
+| Volumes | pakistan_tax_ai_* | (separate) |
+| Nginx Port | 4080 (internal) | (different) |
+| Domain | tax.auditwise.tech | auditwise.tech |
+| SSL | Separate cert | Separate cert |
+| Env File | /opt/pakistan-tax-ai/.env.production | (separate) |
+| Backups | /opt/pakistan-tax-ai/backups/ | (separate) |
+
+---
+
+## Git Branch Strategy
+
+```
+feature/<name>  →  dev  →  main  →  VPS deploy
+     ↑               ↑        ↑
+  workspace     integration  production
+```
+
+- Never deploy from feature branches
+- Never deploy from dev
+- Only main triggers VPS deployment
+- GitHub Actions auto-deploys on push to main
+
+---
+
+## DevOps Commands
+
+All commands run from project root:
+
+```bash
+# Push code to GitHub
+bash devops/control.sh push "your commit message"
+
+# Full deploy to VPS (build + restart)
+bash devops/control.sh deploy
+
+# Quick deploy (pull + recreate, no rebuild)
+bash devops/control.sh deploy-quick
+
+# Check system health
+bash devops/control.sh health
+
+# Container status
+bash devops/control.sh status
+
+# View logs (default: app, 100 lines)
+bash devops/control.sh logs app 200
+bash devops/control.sh logs nginx 50
+bash devops/control.sh logs db 100
+
+# Restart service
+bash devops/control.sh restart app
+bash devops/control.sh restart nginx
+
+# Rebuild service
+bash devops/control.sh rebuild app
+
+# Backup database
+bash devops/control.sh backup
+
+# Rollback to previous commit
+bash devops/control.sh rollback
+
+# Run remote SSH command
+bash devops/control.sh ssh "docker ps"
+
+# Initial VPS setup
+bash devops/control.sh setup-vps
+
+# Setup SSL certificate
+bash devops/control.sh setup-ssl
+```
 
 ---
 
 ## Development Commands
 
 ```bash
-# Start all services
+# Start all services (Replit dev)
 pnpm --filter @workspace/api-server run dev
 pnpm --filter @workspace/tax-engine run dev
 
@@ -187,23 +299,90 @@ pnpm run typecheck
 
 ## Environment Variables
 
+### Development (Replit)
 | Variable         | Required | Description                        |
 |-----------------|----------|------------------------------------|
 | `DATABASE_URL`  | Yes      | PostgreSQL connection string        |
-| `JWT_SECRET`    | Yes      | Secret for JWT signing (change in prod!) |
-| `PORT`          | Yes      | Port for each service ($PORT per artifact) |
+| `JWT_SECRET`    | Yes      | Secret for JWT signing             |
+| `PORT`          | Yes      | Port for each service ($PORT)      |
 | `AI_PROVIDER`   | No       | `openai` (default) or `gemini`     |
 | `OPENAI_API_KEY`| No       | OpenAI key for AI generation       |
-| `UPLOAD_DIR`    | No       | File upload directory (default /tmp/uploads) |
-| `VAULT_DIR`     | No       | Vault storage directory (default /tmp/vault) |
+| `UPLOAD_DIR`    | No       | File upload directory              |
+| `VAULT_DIR`     | No       | Vault storage directory            |
+
+### Production (VPS — /opt/pakistan-tax-ai/.env.production)
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DB_NAME` | Yes | Database name (pakistan_tax_ai) |
+| `DB_USER` | Yes | Database user |
+| `DB_PASSWORD` | Yes | Database password |
+| `JWT_SECRET` | Yes | JWT signing secret (64+ chars) |
+| `SESSION_SECRET` | Yes | Session secret |
+| `ENCRYPTION_MASTER_KEY` | Yes | 32-byte hex encryption key |
+| `NGINX_PORT` | No | Host port for nginx (default: 4080) |
+| `VPS_HOST` | DevOps | VPS hostname/IP (for scripts only) |
+| `VPS_USER` | DevOps | VPS SSH user (for scripts only) |
+| `APP_PATH` | DevOps | /opt/pakistan-tax-ai |
+
+### GitHub Actions Secrets (for auto-deploy)
+| Secret | Description |
+|--------|-------------|
+| `VPS_HOST` | VPS IP address |
+| `VPS_USER` | SSH username (root) |
+| `VPS_SSH_KEY` | Private SSH key for VPS access |
 
 ---
 
-## Deployment (Hostinger VPS)
+## Deployment — First-Time VPS Setup
 
-**IMPORTANT:** GitHub is the source of truth. Never deploy directly from Replit.
+### Prerequisites
+- Hostinger VPS with Ubuntu + Docker installed
+- DNS A record: `tax.auditwise.tech` → VPS IP
+- SSH access to VPS
 
-1. Push to `main` branch → GitHub Actions CI runs
-2. SSH to VPS: `git pull && docker compose -f infra/docker-compose.yml up -d --build`
-3. Set production env vars in `.env` file on VPS (never commit)
-4. Run migrations: `docker exec api node -e "require('./dist/migrate.mjs')"`
+### Step-by-Step
+
+```bash
+# 1. Generate SSH key (local/Replit)
+bash devops/setup-ssh.sh
+
+# 2. Copy public key to VPS
+ssh-copy-id -i ~/.ssh/pakistan_tax_ai_vps root@YOUR_VPS_IP
+
+# 3. Setup VPS directory structure
+bash devops/control.sh setup-vps
+
+# 4. Copy and configure env file on VPS
+scp .env.example root@YOUR_VPS_IP:/opt/pakistan-tax-ai/.env.production
+ssh root@YOUR_VPS_IP "nano /opt/pakistan-tax-ai/.env.production"
+
+# 5. Deploy
+bash devops/control.sh deploy
+
+# 6. Setup SSL
+bash devops/control.sh setup-ssl
+
+# 7. Verify
+bash devops/control.sh health
+curl https://tax.auditwise.tech/health
+```
+
+### GitHub Actions Auto-Deploy
+1. Go to GitHub repo → Settings → Secrets → Actions
+2. Add: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
+3. Push to `main` → auto-deploys to VPS
+
+---
+
+## Health Endpoint
+
+`GET /api/healthz` returns:
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-03-22T...",
+  "services": { "db": "ok", "redis": "not_configured" }
+}
+```
+
+External health check: `https://tax.auditwise.tech/health`

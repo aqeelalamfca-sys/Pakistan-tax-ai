@@ -1,0 +1,78 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - name: Build API Server
+        run: pnpm --filter @workspace/api-server run build
+      - name: Build Frontend
+        run: pnpm --filter @workspace/tax-engine run build
+        env:
+          BASE_PATH: /
+          PORT: 3000
+
+  deploy:
+    name: Deploy to Hostinger VPS
+    runs-on: ubuntu-24.04
+    needs: test
+    environment: production
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            APP_PATH=/opt/pakistan-tax-ai
+
+            echo "=== Backup before deploy ==="
+            if docker ps --filter "name=pakistan-tax-ai-db" --format "{{.Status}}" | grep -q "Up"; then
+                mkdir -p $APP_PATH/backups
+                docker exec pakistan-tax-ai-db pg_dump -U taxai_user pakistan_tax_ai 2>/dev/null | gzip > $APP_PATH/backups/pre_deploy_$(date +%Y%m%d_%H%M%S).sql.gz || echo "Backup skipped (first deploy)"
+            fi
+
+            echo "=== Pulling latest code ==="
+            cd $APP_PATH/app
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "=== Building and deploying ==="
+            export COMPOSE_PROJECT_NAME=pakistan-tax-ai
+            docker compose -f infra/docker-compose.prod.yml --env-file $APP_PATH/.env.production build --no-cache
+            docker compose -f infra/docker-compose.prod.yml --env-file $APP_PATH/.env.production down --remove-orphans || true
+            docker compose -f infra/docker-compose.prod.yml --env-file $APP_PATH/.env.production up -d
+
+            echo "=== Waiting for startup ==="
+            sleep 20
+
+            echo "=== Health check ==="
+            if curl -sf http://localhost:4080/api/healthz; then
+                echo ""
+                echo "✅ Deployment successful"
+            else
+                echo "⚠️ Health check failed — check logs"
+                docker logs --tail 50 pakistan-tax-ai-app
+                exit 1
+            fi
+
+            echo "=== Cleanup old images ==="
+            docker image prune -f || true

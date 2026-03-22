@@ -1,0 +1,209 @@
+You are a Senior Full-Stack DevOps Engineer. Build, separate, containerize, connect, and deploy a NEW standalone project for Pakistan Tax AI under the AuditWise ecosystem, without mixing it with the existing audit application.
+
+PROJECT IDENTITY
+- Project Name: Pakistan Tax AI
+- Live Domain: https://tax.auditwise.tech
+- GitHub Owner: aqeelalamfca-sys
+- Existing Reference Repo: https://github.com/aqeelalamfca-sys/Pakistan-tax-ai
+- If the repository does not yet exist exactly as required, create a NEW GitHub repository under the same owner for this project and connect the codebase to it.
+- Deployment Target: Hostinger VPS (Ubuntu, Docker-based)
+- Deployment Mode: Separate project, separate containers, separate reverse-proxy routing, separate environment variables, separate build/release lifecycle
+- Source of Truth: GitHub only
+- Production branch: main only
+
+PRIMARY OBJECTIVE
+Create and maintain Pakistan Tax AI as a completely separate production-grade application with its own Docker containers, its own VPS app directory, its own environment file, its own database/container naming, and its own Nginx routing so that it runs live on https://tax.auditwise.tech independently from the existing AuditWise audit platform. Do not disturb the existing auditwise.tech application.
+
+NON-NEGOTIABLE ARCHITECTURE
+Replit / Local Dev / Future Workspaces
+          │
+          ▼
+GitHub Repository (single source of truth)
+          │
+          ▼
+Hostinger VPS (pull from main only)
+          │
+          ▼
+tax.auditwise.tech
+
+RULES
+1. GitHub is the only synchronization point.
+2. No environment syncs directly with another environment.
+3. VPS pulls and deploys only from main branch.
+4. This Tax AI project must remain fully isolated from the main audit project.
+5. Separate containers must be created for tax project services.
+6. Existing auditwise.tech production app must remain untouched and available.
+
+PROJECT ISOLATION REQUIREMENTS
+Create this as a separate deployment unit using:
+- Separate VPS path, for example: /opt/pakistan-tax-ai
+- Separate docker compose file or separate compose project name
+- Separate container names such as:
+  - pakistan-tax-ai-app
+  - pakistan-tax-ai-nginx
+  - pakistan-tax-ai-db
+  - pakistan-tax-ai-redis
+- Separate .env.production file
+- Separate logs path
+- Separate backups path
+- Separate Nginx server block / reverse proxy config for tax.auditwise.tech
+- Separate SSL certificate handling for tax.auditwise.tech
+- Separate database name and credentials
+- Separate GitHub Actions / deployment script logic if automation exists
+
+TECHNICAL REQUIREMENTS
+1. Connect Replit project to GitHub repository under aqeelalamfca-sys.
+2. If repo is missing, initialize a new repo and push full codebase there.
+3. Use branch strategy:
+   - main = production
+   - dev = integration
+   - feature/<name> = workspace branch
+4. Build production-ready containerized app.
+5. Deploy to Hostinger VPS using Docker.
+6. Configure domain tax.auditwise.tech to point to the tax project only.
+7. Ensure no port/container/network collision with existing auditwise deployment.
+8. Add health endpoint and production health checks.
+9. Add restart, rebuild, logs, backup, rollback commands.
+10. Keep deployment repeatable and safe.
+
+EXPECTED VPS STRUCTURE
+- /opt/pakistan-tax-ai/
+- /opt/pakistan-tax-ai/app
+- /opt/pakistan-tax-ai/devops
+- /opt/pakistan-tax-ai/backups
+- /opt/pakistan-tax-ai/logs
+- /opt/pakistan-tax-ai/.env.production
+
+DOCKER / CONTAINERIZATION REQUIREMENTS
+Create or update production deployment with separate services such as:
+- app service for backend/fullstack runtime
+- nginx service for reverse proxy
+- postgres service if required
+- redis service if required
+
+Use distinct container names, volume names, and network names, for example:
+- pakistan_tax_ai_network
+- pakistan_tax_ai_postgres_data
+- pakistan_tax_ai_redis_data
+
+Do not reuse the existing AuditWise container names, networks, or volumes.
+
+NGINX / DOMAIN REQUIREMENTS
+Configure a dedicated Nginx virtual host for:
+- server_name tax.auditwise.tech
+
+Requirements:
+- Force HTTPS
+- Redirect HTTP to HTTPS
+- Proxy only to Pakistan Tax AI app container
+- Keep auditwise.tech config unchanged
+- Obtain and renew SSL certificate for tax.auditwise.tech
+- Add health-check friendly routing
+
+GITHUB + DEPLOYMENT REQUIREMENTS
+Implement proper Git workflow:
+- feature branch -> dev -> main -> VPS deploy
+- Never deploy from feature branch
+- Never deploy from dev
+- Deploy only from main
+
+If deployment scripts do not exist, create a devops folder with scripts such as:
+- devops/push.sh
+- devops/deploy.sh
+- devops/deploy-quick.sh
+- devops/health.sh
+- devops/backup.sh
+- devops/rollback.sh
+- devops/logs.sh
+- devops/setup-ssh.sh
+- devops/control.sh
+
+CONTROL SCRIPT REQUIREMENTS
+Create one master script that can do:
+- push to GitHub
+- deploy to VPS
+- quick deploy
+- health check
+- show status
+- show logs
+- restart service
+- rebuild service
+- backup database
+- rollback to previous commit
+- run remote ssh command
+
+Example commands expected:
+- bash devops/control.sh push "tax ai update"
+- bash devops/control.sh deploy
+- bash devops/control.sh deploy-quick
+- bash devops/control.sh health
+- bash devops/control.sh status
+- bash devops/control.sh logs app 200
+- bash devops/control.sh restart app
+- bash devops/control.sh backup
+- bash devops/control.sh rollback
+- bash devops/control.sh ssh "docker ps"
+
+REPLIT REQUIREMENTS
+In Replit:
+- connect repo cleanly
+- configure secrets for GitHub and VPS
+- keep environment production-aware
+- ensure code can be pushed from Replit to GitHub
+- ensure GitHub-backed deployment to VPS works end-to-end
+
+REQUIRED SECRETS
+Configure and consume these securely:
+- GITHUB_PERSONAL_ACCESS_TOKEN
+- VPS_HOST
+- VPS_USER
+- VPS_SSH_KEY
+- DOMAIN=tax.auditwise.tech
+- APP_PATH=/opt/pakistan-tax-ai
+- DATABASE_URL
+- DB_NAME
+- DB_USER
+- DB_PASSWORD
+- REDIS_URL
+- SESSION_SECRET
+- JWT_SECRET
+- ENCRYPTION_MASTER_KEY
+
+DEPLOYMENT SAFETY RULES
+1. Do not break existing auditwise.tech deployment.
+2. Do not overwrite existing docker compose files for audit project.
+3. Do not reuse existing production database unless explicitly intended.
+4. Backup before major deployment.
+5. Validate container health after deployment.
+6. Validate tax.auditwise.tech routing after deployment.
+7. If any conflict appears, resolve by isolation, not by changing the existing audit platform.
+
+POST-DEPLOYMENT VALIDATION
+After deployment, verify:
+- GitHub repo connected and pushed successfully
+- VPS pulled from main successfully
+- docker compose builds successfully
+- all Pakistan Tax AI containers are healthy
+- SSL works on https://tax.auditwise.tech
+- domain opens correctly
+- health endpoint responds successfully
+- restart and redeploy scripts work
+- logs are accessible
+- rollback path is available
+- existing auditwise.tech remains unaffected
+
+DELIVERABLES REQUIRED
+Provide and/or update all of the following:
+1. Separate GitHub repository connection
+2. Dockerfile(s)
+3. docker-compose.yml or equivalent isolated compose setup
+4. Nginx config for tax.auditwise.tech
+5. DevOps scripts
+6. .env.example
+7. Health endpoint
+8. README / replit.md documenting workflow, branch strategy, deploy steps, rollback, backup, and secrets
+9. Production-safe container naming and network naming
+10. End-to-end live deployment readiness for tax.auditwise.tech
+
+STRICT IMPLEMENTATION INSTRUCTION
+Do not merge this project into the existing audit application codebase or deployment stack. Treat Pakistan Tax AI as an independent production system under the same business umbrella only. Keep GitHub sync, VPS deployment, containers, routing, environment, backup, and release management fully separate and production-safe.

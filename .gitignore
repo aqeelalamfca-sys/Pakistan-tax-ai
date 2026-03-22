@@ -47,3 +47,15 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Production secrets (never commit)
+.env.production
+.env.local
+*.pem
+
+# Backups
+backups/
+
+# Uploads / vault (runtime data)
+/uploads
+/vault

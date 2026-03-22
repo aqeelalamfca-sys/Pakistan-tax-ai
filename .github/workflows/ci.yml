@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 jobs:
   typecheck:
@@ -59,7 +59,7 @@ jobs:
           context: .
           file: infra/Dockerfile.api
           push: false
-          tags: tax-engine-api:latest
+          tags: pakistan-tax-ai-app:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Build Frontend Docker Image
@@ -68,6 +68,6 @@ jobs:
           context: .
           file: infra/Dockerfile.frontend
           push: false
-          tags: tax-engine-frontend:latest
+          tags: pakistan-tax-ai-nginx:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

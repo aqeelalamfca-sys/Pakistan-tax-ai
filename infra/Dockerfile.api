@@ -19,8 +19,7 @@ FROM node:24-slim AS runner
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ curl && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/artifacts/api-server/dist ./dist
-COPY --from=build /app/artifacts/api-server/package.json ./
-RUN npm install --omit=dev bcrypt speakeasy
+RUN echo '{"name":"pakistan-tax-ai","private":true}' > package.json && npm install bcrypt speakeasy
 RUN apt-get purge -y python3 make g++ && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 ENV PORT=8080

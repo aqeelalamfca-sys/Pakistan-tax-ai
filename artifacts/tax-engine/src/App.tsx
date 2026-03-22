@@ -16,6 +16,9 @@ import ClientDetail from "./pages/client-detail";
 import Engagements from "./pages/engagements";
 import EngagementWorkspace from "./pages/engagement-workspace";
 import KnowledgeVault from "./pages/vault";
+import TaxRules from "./pages/tax-rules";
+import AuditLogs from "./pages/audit-logs";
+import UsersPage from "./pages/users";
 
 // Configure API client: use relative /api (proxied by Vite to API server)
 setBaseUrl("");
@@ -49,6 +52,9 @@ function Router() {
       <Route path="/clients/:id" component={() => <ProtectedRoute component={ClientDetail} />} />
       <Route path="/engagements" component={() => <ProtectedRoute component={Engagements} />} />
       <Route path="/engagements/:id" component={() => <ProtectedRoute component={EngagementWorkspace} />} />
+      <Route path="/rules" component={() => <ProtectedRoute component={TaxRules} />} />
+      <Route path="/audit" component={() => <ProtectedRoute component={AuditLogs} />} />
+      <Route path="/users" component={() => <ProtectedRoute component={UsersPage} />} />
       <Route path="/vault" component={() => <ProtectedRoute component={KnowledgeVault} />} />
       
       {/* Missing implementation placeholders falling back to not found nicely */}

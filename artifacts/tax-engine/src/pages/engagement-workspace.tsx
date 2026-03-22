@@ -10,7 +10,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { 
-  UploadCloud, FileCheck, Map, Calculator, Shield, 
+  UploadCloud, FileCheck, Map, Calculator, Shield, Database, FolderKanban,
   AlertTriangle, MessageSquare, Sparkles, CheckCircle2, XCircle, FileType, CheckCircle, Lock, Unlock, Play
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,7 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, hasRequiredRole } from "@/hooks/use-auth";
 
 // --- Tab Components ---
 
@@ -308,6 +308,255 @@ const ComputationTab = ({ engagementId, isPartner }: { engagementId: string, isP
   );
 };
 
+const WithholdingTab = ({ engagementId }: { engagementId: string }) => {
+  const { data, isLoading } = useGetWithholdingEntries(engagementId);
+  const entries = (data?.entries ?? []) as any[];
+  const exceptions = entries.filter(e => e.isException || e.hasException || Number(e.shortDeduction) > 0);
+  const totalWHT = entries.reduce((s, e) => s + Number(e.whtDeducted ?? e.amountWithheld ?? 0), 0);
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="grid grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Total Entries</p>
+            <p className="text-3xl font-bold mt-1">{entries.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-amber-50/50 border-amber-200">
+          <CardContent className="pt-6">
+            <p className="text-sm text-amber-800 font-medium">Exceptions / Mismatches</p>
+            <p className="text-3xl font-bold text-amber-700 mt-1">{exceptions.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Total WHT Amount</p>
+            <p className="text-2xl font-bold text-primary mt-1">{formatCurrency(totalWHT)}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <FileType className="w-5 h-5 text-primary" />
+            Withholding Tax Register
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-8 text-center animate-pulse text-muted-foreground">Loading WHT entries...</div>
+          ) : entries.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">No withholding entries found. Upload a withholding schedule first.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Payer</TableHead>
+                  <TableHead>NTN / CNIC</TableHead>
+                  <TableHead>Section</TableHead>
+                  <TableHead className="text-right">Gross Amount</TableHead>
+                  <TableHead className="text-right">WHT Rate %</TableHead>
+                  <TableHead className="text-right">Amount Withheld</TableHead>
+                  <TableHead>Exception</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {entries.map(entry => {
+                  const isEx = entry.isException || entry.hasException || Number(entry.shortDeduction) > 0;
+                  const vendorName = entry.vendorName ?? entry.payerName ?? "—";
+                  const vendorNtn = entry.vendorNtn ?? entry.payerNtn ?? "—";
+                  const section = entry.sectionCode ?? entry.section ?? "—";
+                  const gross = Number(entry.grossAmount ?? 0);
+                  const rate = Number(entry.actualRate ?? entry.whtRate ?? entry.expectedRate ?? 0);
+                  const withheld = Number(entry.whtDeducted ?? entry.amountWithheld ?? 0);
+                  return (
+                    <TableRow key={entry.id} className={cn("hover:bg-muted/40", isEx && "bg-amber-50/50 dark:bg-amber-950/10")}>
+                      <TableCell className="font-medium text-sm">{vendorName}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{vendorNtn}</TableCell>
+                      <TableCell>
+                        <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded">
+                          §{section}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">{formatCurrency(gross)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{rate.toFixed(2)}%</TableCell>
+                      <TableCell className="text-right font-mono text-sm font-semibold">{formatCurrency(withheld)}</TableCell>
+                      <TableCell>
+                        {isEx ? (
+                          <span className="flex items-center gap-1 text-xs text-amber-700 font-medium">
+                            <AlertTriangle className="w-3.5 h-3.5" /> {entry.shortDeduction > 0 ? `Short: Rs. ${Number(entry.shortDeduction).toLocaleString()}` : "Exception"}
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-xs text-green-700">
+                            <CheckCircle className="w-3.5 h-3.5" /> OK
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+const RiskRegisterTab = ({ engagementId }: { engagementId: string }) => {
+  const { data, isLoading } = useListRisks(engagementId);
+  const updateMutation = useUpdateRiskStatus();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const risks = data?.risks ?? [];
+  const openHigh = risks.filter(r => r.severity === "HIGH" && r.status === "open").length;
+
+  const handleStatusChange = (id: string, status: string) => {
+    updateMutation.mutate(
+      { id, data: { status } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: [`/api/risks/${engagementId}`] });
+          toast({ title: "Risk status updated" });
+        },
+        onError: (err) => toast({ variant: "destructive", title: "Error", description: err.message })
+      }
+    );
+  };
+
+  const SEVERITY_STYLE: Record<string, string> = {
+    HIGH: "bg-red-100 text-red-800 border-red-200",
+    MEDIUM: "bg-amber-100 text-amber-800 border-amber-200",
+    LOW: "bg-green-100 text-green-800 border-green-200",
+  };
+
+  const STATUS_STYLE: Record<string, string> = {
+    open: "bg-red-50 text-red-700",
+    mitigated: "bg-blue-50 text-blue-700",
+    accepted: "bg-slate-100 text-slate-700",
+    closed: "bg-green-50 text-green-700",
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {openHigh > 0 && (
+        <div className="flex items-center gap-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl p-4">
+          <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-red-800 dark:text-red-400">Computation Lock Blocked</p>
+            <p className="text-xs text-red-700 dark:text-red-500">{openHigh} HIGH severity risk{openHigh > 1 ? "s" : ""} remain open. Resolve or accept them before locking.</p>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "Total Risks", value: risks.length },
+          { label: "Open HIGH", value: risks.filter(r => r.severity === "HIGH" && r.status === "open").length, cls: "text-red-600" },
+          { label: "Open MEDIUM", value: risks.filter(r => r.severity === "MEDIUM" && r.status === "open").length, cls: "text-amber-600" },
+          { label: "Closed / Mitigated", value: risks.filter(r => r.status === "closed" || r.status === "mitigated").length, cls: "text-green-600" },
+        ].map(stat => (
+          <Card key={stat.label}>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">{stat.label}</p>
+              <p className={cn("text-3xl font-bold mt-1", stat.cls ?? "text-foreground")}>{stat.value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-primary" />
+            Risk Items ({risks.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-8 text-center animate-pulse text-muted-foreground">Loading risks...</div>
+          ) : risks.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">No risks detected. Run Tax Rules engine to auto-detect risks.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Risk Title</TableHead>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Source Rule</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {risks.map(risk => (
+                  <TableRow key={risk.id} className="hover:bg-muted/40">
+                    <TableCell>
+                      <div className="font-medium text-sm">{risk.title}</div>
+                      {risk.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{risk.description}</div>}
+                    </TableCell>
+                    <TableCell>
+                      <span className={cn("text-xs font-bold px-2 py-0.5 rounded border", SEVERITY_STYLE[risk.severity ?? "MEDIUM"])}>
+                        {risk.severity}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm capitalize">{risk.category?.replace(/_/g, " ") ?? "—"}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{risk.sourceRuleCode ?? "Manual"}</TableCell>
+                    <TableCell>
+                      <span className={cn("text-xs font-semibold px-2 py-0.5 rounded capitalize", STATUS_STYLE[risk.status ?? "open"])}>
+                        {risk.status}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {risk.status === "open" && (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => handleStatusChange(risk.id, "mitigated")}
+                            disabled={updateMutation.isPending}
+                          >
+                            Mitigate
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-muted-foreground"
+                            onClick={() => handleStatusChange(risk.id, "accepted")}
+                            disabled={updateMutation.isPending}
+                          >
+                            Accept
+                          </Button>
+                        </div>
+                      )}
+                      {risk.status !== "open" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => handleStatusChange(risk.id, "open")}
+                          disabled={updateMutation.isPending}
+                        >
+                          Reopen
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
 const AiAssistantTab = ({ engagementId }: { engagementId: string }) => {
   const [promptKey, setPromptKey] = useState("TAX_MEMO_DRAFT");
   const [contextInput, setContextInput] = useState("");
@@ -495,8 +744,8 @@ export default function EngagementWorkspace() {
             <TabsContent value="uploads" className="m-0 h-full"><UploadCenter engagementId={eng.id} /></TabsContent>
             <TabsContent value="validation" className="m-0 h-full"><ValidationTab engagementId={eng.id} /></TabsContent>
             <TabsContent value="computation" className="m-0 h-full"><ComputationTab engagementId={eng.id} isPartner={isPartner} /></TabsContent>
-            <TabsContent value="withholding" className="m-0 h-full"><div className="text-center p-8">Withholding Review component loaded...</div></TabsContent>
-            <TabsContent value="risks" className="m-0 h-full"><div className="text-center p-8">Risk Register loaded...</div></TabsContent>
+            <TabsContent value="withholding" className="m-0 h-full"><WithholdingTab engagementId={eng.id} /></TabsContent>
+            <TabsContent value="risks" className="m-0 h-full"><RiskRegisterTab engagementId={eng.id} /></TabsContent>
             <TabsContent value="ai" className="m-0 h-full"><AiAssistantTab engagementId={eng.id} /></TabsContent>
           </div>
         </Tabs>

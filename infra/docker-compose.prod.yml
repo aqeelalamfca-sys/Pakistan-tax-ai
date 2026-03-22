@@ -35,7 +35,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 8080
-      DATABASE_URL: postgresql://${DB_USER:-taxai_user}:${DB_PASSWORD}@pakistan-tax-ai-db:5432/${DB_NAME:-pakistan_tax_ai}
+      DATABASE_URL: postgresql://${DB_USER:-taxai_user}:${DB_PASSWORD}@pakistan-tax-ai-db:5432/${DB_NAME:-pakistan_tax_ai}?sslmode=disable
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       SESSION_SECRET: ${SESSION_SECRET:-}
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY:-}

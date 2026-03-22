@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   LayoutDashboard, Users, FolderOpen, BookOpen, 
-  ShieldAlert, Settings, LogOut, ChevronDown, Menu, UserCircle, Database
+  ShieldAlert, Settings, LogOut, ChevronDown, Menu, UserCircle, Database, Brain
 } from "lucide-react";
 import { useAuth, hasRequiredRole } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/rules", label: "Tax Rules", icon: BookOpen, minRole: "TAX_MANAGER" },
   { href: "/audit", label: "Audit Logs", icon: ShieldAlert, minRole: "FIRM_ADMIN" },
   { href: "/vault", label: "Knowledge Vault", icon: Database, minRole: "SUPER_ADMIN" },
+  { href: "/ai-settings", label: "AI Settings", icon: Brain, minRole: "SUPER_ADMIN" },
   { href: "/users", label: "Team & Users", icon: Settings, minRole: "FIRM_ADMIN" },
 ];
 
